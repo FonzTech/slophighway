@@ -6492,6 +6492,7 @@
                 for (let ci = 0; ci < chords.length; ci++) {
                     const ch = chords[ci];
                     const runSig = chordShapeSignature(ch);
+                    const chordName = chordTemplateLabel(bundle.chordTemplates?.[ch.id]);
                     let firstInShapeRun;
                     if (runSig === null) {
                         firstInShapeRun = true;
@@ -6754,6 +6755,29 @@
                     // Chord frame-box: rim bars + interior fill gradient.
                     const chDt = chDtEarly; // already computed above for anchor selection
                     const chordTailMul = hwyPostHitTailFadeMul(chDt, chordTailHoldS, chordNextSoon, chordTailFadeS);
+                    if (
+                        chordName &&
+                        chDt > -chordTailHoldS &&
+                        chDt < AHEAD
+                    ) {
+                        const lblW = 28 * K, lblH = 9 * K;
+                        const lbl = pChordLbl.get();
+                        const mat = txtMat(chordName, '#e8d080', true, 'chord');
+                        if (lbl.material.map !== mat.map) { lbl.material.map = mat.map; lbl.material.needsUpdate = true; }
+                        const fade = Math.max(0, 1 - chDt / AHEAD);
+                        lbl.material.opacity = Math.min(1, 0.3 + fade * 0.7) * chordTailMul;
+                        const lblWS = lblW * _textSizeMul;
+                        const lblHS = lblH * _textSizeMul;
+                        const frameLeft = chordFrameXL ?? chordCX - openNoteLaneBoxW(ch.t) * 0.5;
+                        const yMaxF = Math.max(sY(0), sY(nStr - 1)) + S_GAP * 0.8;
+                        const nameShiftX = NW * 0.94;
+                        const nameVertTuck = NH * 0.02;
+                        lbl.position.set(
+                            frameLeft - lblWS / 2 + nameShiftX,
+                            yMaxF + lblHS / 2 - nameVertTuck,
+                            Math.min(0, dZ(chDt)));
+                        lbl.scale.set(lblWS, lblHS, 1);
+                    }
                     if (chShape.size > 1 && chDt > -chordTailHoldS && chDt < AHEAD && chordOpenBoxW != null
                     ) {
                         const z = Math.min(0, dZ(chDt));
@@ -7001,26 +7025,6 @@
                                 drawHalo(cx - width * 0.5 + ftSide * 0.5, sideCy, ftSide, sideH, expand, 1.0, op);
                                 drawHalo(cx + width * 0.5 - ftSide * 0.5, sideCy, ftSide, sideH, expand, 1.0, op);
                             }
-                        }
-
-                        const chordName = chordTemplateLabel(bundle.chordTemplates?.[ch.id]);
-                        if (chordName && firstInShapeRun && !chordWireHighDensity(ch)) {
-                            const lblW = 28 * K, lblH = 9 * K;
-                            const lbl = pChordLbl.get();
-                            const mat = txtMat(chordName, '#e8d080', true, 'chord');
-                            if (lbl.material.map !== mat.map) { lbl.material.map = mat.map; lbl.material.needsUpdate = true; }
-                            lbl.material.opacity = Math.min(1, 0.3 + fade * 0.7) * chordTailMul;
-                            // Gold chord name: slight +X shift from flush-left so it sits farther right.
-                            const lblWS = lblW * _textSizeMul;
-                            const lblHS = lblH * _textSizeMul;
-                            const frameLeft = cx - width / 2;
-                            const nameShiftX = NW * 0.94;
-                            const nameVertTuck = NH * 0.02;
-                            lbl.position.set(
-                                frameLeft - lblWS / 2 + nameShiftX,
-                                yMaxF + lblHS / 2 - nameVertTuck,
-                                z);
-                            lbl.scale.set(lblWS, lblHS, 1);
                         }
 
                         // Shape-based barre detection for the 3D indicator.

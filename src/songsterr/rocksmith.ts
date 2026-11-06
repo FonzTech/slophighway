@@ -382,7 +382,22 @@ function chordTemplateId(
 }
 
 export function buildRsArrangement(track: SongsterrTrack, timing: SongTiming | null): RsArrangement {
-  const strings = Math.max(1, track.strings || track.tuning?.length || 6);
+  const sourceStrings = Math.max(1, track.strings || track.tuning?.length || 6);
+  const foldTwelveString = sourceStrings === 12 && !/bass/i.test(track.instrument);
+  const strings = foldTwelveString ? 6 : sourceStrings;
+  const lowerCourseString = (pairStart: number): number => {
+    const first = track.tuning[pairStart];
+    const second = track.tuning[pairStart + 1];
+    if (first === undefined) return second === undefined ? pairStart : pairStart + 1;
+    return second !== undefined && second < first ? pairStart + 1 : pairStart;
+  };
+  const tuning = foldTwelveString
+    ? Array.from({ length: 6 }, (_, i) => {
+        const first = track.tuning[i * 2] ?? track.tuning[i * 2 + 1] ?? 0;
+        const second = track.tuning[i * 2 + 1] ?? first;
+        return Math.min(first, second);
+      })
+    : track.tuning;
   const { occurrences, tpqn, source } = buildOccurrences(track, timing);
   const events = collectBeatEvents(track, occurrences, tpqn);
 
@@ -396,9 +411,28 @@ export function buildRsArrangement(track: SongsterrTrack, timing: SongTiming | n
   for (const ev of events) {
     const tSec = ev.startMs / 1000;
     const fresh: RsNote[] = [];
-    for (const n of ev.beat.notes ?? []) {
+    const beatNotes = ev.beat.notes ?? [];
+    let visualNotes = beatNotes;
+    if (foldTwelveString) {
+      const courseNotes = new Map<number, SongsterrNote>();
+      for (const note of beatNotes) {
+        if (
+          note.rest ||
+          typeof note.string !== "number" ||
+          typeof note.fret !== "number"
+        ) {
+          continue;
+        }
+        const pairStart = Math.floor(note.string / 2) * 2;
+        const current = courseNotes.get(pairStart);
+        if (!current || note.string === lowerCourseString(pairStart)) courseNotes.set(pairStart, note);
+      }
+      visualNotes = [...courseNotes.values()];
+    }
+    for (const n of visualNotes) {
       if (n.rest || typeof n.string !== "number" || typeof n.fret !== "number") continue;
-      const s = strings - 1 - n.string;
+      const sourceString = foldTwelveString ? Math.floor(n.string / 2) : n.string;
+      const s = strings - 1 - sourceString;
       if (s < 0 || s >= strings) continue;
 
       const prev = lastOnString[s];
@@ -430,8 +464,8 @@ export function buildRsArrangement(track: SongsterrTrack, timing: SongTiming | n
       fresh.push(rs);
     }
 
-    if (fresh.length >= 2) {
-      const name = ev.beat.chord?.text?.trim() ?? "";
+    const name = ev.beat.chord?.text?.trim() ?? "";
+    if (fresh.length >= 2 || (fresh.length > 0 && name.length > 0)) {
       const id = chordTemplateId(chordTemplates, templateIndex, name, fresh, strings);
       chords.push({ t: tSec, id, notes: fresh.sort((a, b) => a.s - b.s) });
     } else if (fresh.length === 1) {
@@ -469,7 +503,7 @@ export function buildRsArrangement(track: SongsterrTrack, timing: SongTiming | n
     name: track.name,
     instrument: track.instrument,
     strings,
-    tuning: track.tuning,
+    tuning,
     capo: track.capo ?? 0,
     notes,
     chords,
