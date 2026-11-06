@@ -284,6 +284,44 @@
   color: rgba(232, 238, 247, 0.85);
 }
 
+#shh-root .shh-touch-nav {
+  display: none;
+  position: absolute;
+  left: 10px;
+  bottom: 62px;
+  z-index: 4;
+  gap: 8px;
+  pointer-events: none;
+  user-select: none;
+}
+
+#shh-root.shh-touch-controls .shh-touch-nav {
+  display: flex;
+}
+
+#shh-root .shh-touch-nav-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font-size: 20px;
+  font-family: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#shh-root .shh-touch-nav-btn:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 #shh-root .shh-track-badge.shh-flash {
   transform: translateX(-50%) scale(1.9);
   background: rgba(10, 14, 22, 0.9);

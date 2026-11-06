@@ -59,6 +59,10 @@ export function webgl2Available(): boolean {
   }
 }
 
+export function hasTouchSupport(): boolean {
+  return navigator.maxTouchPoints > 0;
+}
+
 export class Highway3D implements HighwayView {
   private stage: HTMLElement;
   private canvas: HTMLCanvasElement;

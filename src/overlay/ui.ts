@@ -3,8 +3,8 @@ import type { RsArrangement } from "../songsterr/rocksmith";
 import { retuneToStandard } from "../songsterr/tuning";
 import { PlaybackClock, type HighwayView } from "./clock";
 import { Highway2D } from "./highway";
-import { Highway3D, parseQuality, qualityOptions, webgl2Available, type Quality } from "./host3d";
-import { mountControlsLegend, SongInfoBox, TrackBadge, trackHotkey, trackLabel, type SongInfo } from "./tracks";
+import { Highway3D, hasTouchSupport, parseQuality, qualityOptions, webgl2Available, type Quality } from "./host3d";
+import { mountControlsLegend, mountTouchNav, SongInfoBox, TrackBadge, trackHotkey, trackLabel, type SongInfo } from "./tracks";
 
 export type OverlayController = {
   /** `preferredPartId` is the part Songsterr is showing; a manual pick in the overlay wins over it. */
@@ -31,6 +31,8 @@ type Prefs = {
   quality: Quality;
   /** Show every track re-fretted for E standard. */
   standard: boolean;
+  /** Enable on-screen touch controls (behavior to be defined). */
+  touchControls: boolean;
 };
 
 const PREFS_KEY = "shh-prefs";
@@ -55,6 +57,7 @@ function defaultPrefs(): Prefs {
     transparent: false,
     quality: "balanced",
     standard: false,
+    touchControls: hasTouchSupport(),
   };
 }
 
@@ -110,6 +113,10 @@ export function mountOverlay(): OverlayController {
         <select class="shh-select shh-quality" aria-label="Quality" title="Lower quality renders fewer pixels and caps the frame rate at 60">
           ${qualityOptions()}
         </select>
+        <select class="shh-select shh-touch" aria-label="Touch controls" title="Enable on-screen touch controls">
+          <option value="yes">Touch controls: yes</option>
+          <option value="no">Touch controls: no</option>
+        </select>
         <button type="button" class="shh-btn shh-std" title="Re-fret every track for E standard tuning"></button>
         <select class="shh-select shh-dock" aria-label="Position">
           <option value="top">Dock top</option>
@@ -137,6 +144,7 @@ export function mountOverlay(): OverlayController {
   const viewSelect = root.querySelector(".shh-view") as HTMLSelectElement;
   const dockSelect = root.querySelector(".shh-dock") as HTMLSelectElement;
   const qualitySelect = root.querySelector(".shh-quality") as HTMLSelectElement;
+  const touchSelect = root.querySelector(".shh-touch") as HTMLSelectElement;
   const stdBtn = root.querySelector(".shh-std") as HTMLButtonElement;
   const detachBtn = root.querySelector(".shh-detach") as HTMLButtonElement;
   const bgBtn = root.querySelector(".shh-bg") as HTMLButtonElement;
@@ -153,6 +161,23 @@ export function mountOverlay(): OverlayController {
   const badge = new TrackBadge(stage);
   const info = new SongInfoBox(stage);
   mountControlsLegend(stage);
+  const touchNav = mountTouchNav(stage);
+  const touchNavBtns = [...touchNav.querySelectorAll<HTMLButtonElement>(".shh-touch-nav-btn")];
+  touchNavBtns.forEach((arrow) => {
+    arrow.addEventListener("click", () => {
+      const key = arrow.classList.contains("shh-arrow-right") ? "ArrowRight" : "ArrowLeft";
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key,
+          code: key,
+          keyCode: key === "ArrowRight" ? 39 : 37,
+          which: key === "ArrowRight" ? 39 : 37,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+  });
   let prefs = defaultPrefs();
   let view: HighwayView | null = null;
   let arrangements: RsArrangement[] = [];
@@ -188,6 +213,7 @@ export function mountOverlay(): OverlayController {
     root.classList.toggle("shh-collapsed", collapsed);
     root.classList.toggle("shh-is-detached", detached());
     root.classList.toggle("shh-transparent", prefs.transparent);
+    root.classList.toggle("shh-touch-controls", prefs.touchControls);
     const s = root.style;
     s.left = s.right = s.top = s.bottom = s.width = "";
 
@@ -217,6 +243,7 @@ export function mountOverlay(): OverlayController {
 
     dockSelect.value = prefs.dock;
     qualitySelect.value = prefs.quality;
+    touchSelect.value = prefs.touchControls ? "yes" : "no";
     stdBtn.textContent = prefs.standard ? "E Std: on" : "E Std: off";
     stdBtn.classList.toggle("shh-on", prefs.standard);
     detachBtn.textContent = detached() ? "Attach" : "Detach";
@@ -277,6 +304,10 @@ export function mountOverlay(): OverlayController {
   qualitySelect.addEventListener("change", () => {
     update({ quality: parseQuality(qualitySelect.value) });
     if (view instanceof Highway3D) view.setQuality(prefs.quality);
+  });
+
+  touchSelect.addEventListener("change", () => {
+    update({ touchControls: touchSelect.value === "yes" });
   });
 
   const pickTrack = (partId: number) => {
