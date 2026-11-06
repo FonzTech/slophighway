@@ -43,6 +43,14 @@ const VERSION = "0.6.2";
 const TOUCH_REPEAT_DELAY_MS = 300;
 /** Fixed interval between auto-repeat presses while a touch arrow button is held. */
 const TOUCH_REPEAT_INTERVAL_MS = 100;
+/** Tap zone (0–1 fraction of width) that counts as the touch play/pause button: min x. */
+const TOUCH_PLAY_MIN_X = 0.3;
+/** Tap zone (0–1 fraction of width) that counts as the touch play/pause button: max x. */
+const TOUCH_PLAY_MAX_X = 0.6;
+/** Tap zone (0–1 fraction of height) that counts as the touch play/pause button: min y. */
+const TOUCH_PLAY_MIN_Y = 0.3;
+/** Tap zone (0–1 fraction of height) that counts as the touch play/pause button: max y. */
+const TOUCH_PLAY_MAX_Y = 0.6;
 
 function defaultFloat(): FloatRect {
   const w = Math.round(window.innerWidth * 0.6);
@@ -387,6 +395,21 @@ export function mountOverlay(): OverlayController {
     if (play) play.click();
     else status.textContent = "play button not found on this page";
   };
+
+  stage.addEventListener("pointerdown", (e) => {
+    if (!prefs.touchControls) return;
+    const w = stage.clientWidth;
+    const h = stage.clientHeight;
+    if (!w || !h) return;
+    const nx = e.clientX - stage.getBoundingClientRect().left;
+    const ny = e.clientY - stage.getBoundingClientRect().top;
+    const inCenterCell =
+      nx >= w * TOUCH_PLAY_MIN_X &&
+      nx <= w * TOUCH_PLAY_MAX_X &&
+      ny >= h * TOUCH_PLAY_MIN_Y &&
+      ny <= h * TOUCH_PLAY_MAX_Y;
+    if (inCenterCell) togglePlayback();
+  });
 
   const onConnect = (port: chrome.runtime.Port) => {
     if (port.name !== DETACHED_PORT) return;
