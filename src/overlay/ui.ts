@@ -39,6 +39,10 @@ const PREFS_KEY = "shh-prefs";
 const MIN_HEIGHT = 120;
 const MIN_FLOAT_WIDTH = 360;
 const VERSION = "0.6.2";
+/** Hold time before a touch arrow button starts auto-repeating. */
+const TOUCH_REPEAT_DELAY_MS = 300;
+/** Fixed interval between auto-repeat presses while a touch arrow button is held. */
+const TOUCH_REPEAT_INTERVAL_MS = 100;
 
 function defaultFloat(): FloatRect {
   const w = Math.round(window.innerWidth * 0.6);
@@ -163,20 +167,44 @@ export function mountOverlay(): OverlayController {
   mountControlsLegend(stage);
   const touchNav = mountTouchNav(stage);
   const touchNavBtns = [...touchNav.querySelectorAll<HTMLButtonElement>(".shh-touch-nav-btn")];
+  const dispatchArrow = (arrow: HTMLButtonElement) => {
+    const key = arrow.classList.contains("shh-arrow-right") ? "ArrowRight" : "ArrowLeft";
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key,
+        code: key,
+        keyCode: key === "ArrowRight" ? 39 : 37,
+        which: key === "ArrowRight" ? 39 : 37,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  };
   touchNavBtns.forEach((arrow) => {
-    arrow.addEventListener("click", () => {
-      const key = arrow.classList.contains("shh-arrow-right") ? "ArrowRight" : "ArrowLeft";
-      document.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key,
-          code: key,
-          keyCode: key === "ArrowRight" ? 39 : 37,
-          which: key === "ArrowRight" ? 39 : 37,
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
+    let repeatDelay: number | undefined;
+    let repeatTimer: number | undefined;
+    const stopRepeat = () => {
+      if (repeatDelay !== undefined) {
+        clearTimeout(repeatDelay);
+        repeatDelay = undefined;
+      }
+      if (repeatTimer !== undefined) {
+        clearInterval(repeatTimer);
+        repeatTimer = undefined;
+      }
+    };
+    arrow.addEventListener("pointerdown", () => {
+      stopRepeat();
+      dispatchArrow(arrow);
+      repeatDelay = window.setTimeout(() => {
+        repeatDelay = undefined;
+        repeatTimer = window.setInterval(() => dispatchArrow(arrow), TOUCH_REPEAT_INTERVAL_MS);
+      }, TOUCH_REPEAT_DELAY_MS);
     });
+    arrow.addEventListener("contextmenu", (e) => e.preventDefault());
+    for (const stop of ["pointerup", "pointerleave", "pointercancel"]) {
+      arrow.addEventListener(stop, stopRepeat);
+    }
   });
   let prefs = defaultPrefs();
   let view: HighwayView | null = null;
