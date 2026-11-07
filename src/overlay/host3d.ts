@@ -92,13 +92,13 @@ export const CAMERA_DISTANCE_FACTOR: Record<CameraDistance, number> = {
 };
 
 export const CAMERA_DISTANCE_LABELS: Record<CameraDistance, string> = {
-  farthest: "Camera Distance: Farthest",
-  farther: "Camera Distance: Farther",
-  far: "Camera Distance: Far",
-  normal: "Camera Distance: Normal",
-  near: "Camera Distance: Near",
-  nearer: "Camera Distance: Nearer",
-  nearest: "Camera Distance: Nearest",
+  farthest: "Camera distance: Farthest",
+  farther: "Camera distance: Farther",
+  far: "Camera distance: Far",
+  normal: "Camera distance: Normal",
+  near: "Camera distance: Near",
+  nearer: "Camera distance: Nearer",
+  nearest: "Camera distance: Nearest",
 };
 
 export function cameraDistanceOptions(): string {

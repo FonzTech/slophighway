@@ -148,14 +148,20 @@
 
 #shh-root .shh-options {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
+  flex-direction: column;
+  gap: 10px;
 }
 
-#shh-root .shh-options > button,
-#shh-root .shh-options > select {
-  margin-bottom: 10px;
-  margin-right: 10px;
+#shh-root .shh-options .shh-group-title {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+#shh-root .shh-options .shh-group-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
 }
 
 #shh-root.shh-options-hidden .shh-options {

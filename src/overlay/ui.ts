@@ -178,8 +178,8 @@ export function mountOverlay(): OverlayController {
     dockSelect.value = prefs.dock;
     detachBtn.textContent = detached() ? "Attach" : "Detach";
     bgBtn.textContent = prefs.transparent ? "BG: clear" : "BG: solid";
-    maxBtn.textContent = prefs.maximized ? "Exit full" : "Full";
-    collapseBtn.textContent = prefs.collapsed ? "Show" : "Hide";
+    maxBtn.textContent = prefs.maximized ? "Exit fullscreen" : "Fullscreen";
+    collapseBtn.textContent = prefs.collapsed ? "Show Highway" : "Hide Highway";
     shell.syncControls();
     shell.view?.resize();
   };
