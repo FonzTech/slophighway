@@ -498,6 +498,11 @@
     const NEXT_CHORDS_ANIM_S = 0.25;
     // Longest a chord name stays at the hit line on the highway while waiting for the next named chord.
     const CHORD_NAME_HOLD_S = 10;
+    // Chord gems vanish this long after their onset (or sustain end); the frame and ghost digits keep CHORD_HWY_LINGER_S.
+    const CHORD_GEM_LINGER_S = 0.05;
+    // How many seconds before the hit the ghost outline gem (and its fret digit) shows on the fretboard for an
+    // incoming note. 0 hides it entirely; the original renderer used 0.6.
+    const INCOMING_OUTLINE_S = 0;
     // Fully opaque until the last DIAG_FADEOUT_S of the linger window; dt = chord.t - now (<= 0).
     const diagLingerOpacity = (dt) => Math.max(0, Math.min(1, (DIAG_LINGER_S + dt) / DIAG_FADEOUT_S));
     const DIAG_ENTRANCE_S  = 0.20;
@@ -8127,6 +8132,7 @@
             }
 
             const sustained = dt < 0 && hasSus && now <= susEnd;
+            const gemGone = fromChord && !_ndHasProvider && dt < -CHORD_GEM_LINGER_S && !sustained;
             const hitDist = Math.abs(dt);
             const hit = hitDist < 0.15 || sustained;
             const hitFade = sustained ? 0.7 : (hitDist < 0.15 ? 1 - hitDist / 0.15 : 0);
@@ -8148,9 +8154,9 @@
             // For skipBody=true (slide targets), defaults are safe no-ops.
             const openSlabThickMul = n.f === 0 ? 1.5 : 1;
             const approachRot = n.f > 0 ? Math.max(0, Math.min(1, dt / AHEAD)) * Math.PI / 2 : 0;
-            const PROJ_WIN_G = 0.6;
+            const PROJ_WIN_G = Math.max(INCOMING_OUTLINE_S, 1e-6);
             const projFactorG = Math.max(0, Math.min(1, 1 - Math.max(dt, 0) / PROJ_WIN_G));
-            const inGhostWin = n.f > 0 && isNextOnString && dt > -ghostHold && dt < PROJ_WIN_G && projFactorG > 0.001;
+            const inGhostWin = INCOMING_OUTLINE_S > 0 && n.f > 0 && isNextOnString && dt > -ghostHold && dt < PROJ_WIN_G && projFactorG > 0.001;
             // slopsmith#254 — query the provider once per note, before both !skipBody
             // blocks, so _showHit can be a const and _ndGood is available for the
             // sustain trail (which renders even when skipBody=true for slide targets).
@@ -8184,7 +8190,7 @@
             // proximity heuristic, including the pre-hit ghost window preview.
             const _showHit = (_ndState === 'miss') ? false : (_ndState ? _ndGood : (hit || (n.f > 0 && inGhostWin)));
 
-            if (!skipBody) {
+            if (!skipBody && !gemGone) {
 
                 // ── Outline (slightly larger, bright emissive) ────────────
                 // Notedetect feedback (#9): if a recent hit/miss event
@@ -8463,7 +8469,7 @@
                     }
             }
 
-            if (!skipBody) {
+            if (!skipBody && !gemGone) {
                 // ── Technique labels ──────────────────────────────────────
                 // Label scale = base × LBL_MULT × distFactor.
                 // distFactor compensates for perspective shrink so a
@@ -8598,7 +8604,7 @@
             }
 
             // ── Board ghost: filled rim at Z=0 (always drawn for isNext) ─
-            const PROJ_WIN = 0.6;
+            const PROJ_WIN = Math.max(INCOMING_OUTLINE_S, 1e-6);
             const projFactor = Math.max(0, Math.min(1, 1 - Math.max(dt, 0) / PROJ_WIN));
             // isBlocked suppresses the pre-impact ghost for sustains so it
             // doesn't peek out from under the incoming note body in the
@@ -8607,7 +8613,7 @@
             // frame + digits — without the dt>0 gate, all post-hit
             // sustain frames silently suppress the ghost too.
             const isBlocked = dt > 0 && dt < 0.15 && n.sus > 0;
-            if (n.f > 0 && isNextOnString && projectionVisible && dt > -ghostHold && dt < PROJ_WIN && projFactor > 0.001 && !isBlocked) {
+            if (INCOMING_OUTLINE_S > 0 && n.f > 0 && isNextOnString && projectionVisible && dt > -ghostHold && dt < PROJ_WIN && projFactor > 0.001 && !isBlocked) {
                 // Ghost stays at final "on the board" orientation — not the
                 // incoming approachRot sweep — so it nests with the note at impact.
                 const projRim = 0; // harmonic gems now land horizontal (no diamond offset)
