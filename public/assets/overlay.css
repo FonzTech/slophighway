@@ -148,8 +148,28 @@
 
 #shh-root .shh-options {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 10px;
+  flex-basis: 100%;
+  width: 100%;
+}
+
+#shh-root .shh-options .shh-group {
+  flex: 1 1 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1100px) {
+  #shh-root .shh-options {
+    display: block;
+  }
+
+  #shh-root .shh-options .shh-group {
+    display: inline-block;
+    vertical-align: top;
+    margin-right: 16px;
+    margin-bottom: 8px;
+  }
 }
 
 #shh-root .shh-options .shh-group-title {
