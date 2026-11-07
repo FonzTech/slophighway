@@ -115,17 +115,42 @@
   display: none;
 }
 
+#shh-root .shh-toolbar-parent {
+  background: linear-gradient(180deg, rgba(10, 14, 22, 0.96), rgba(10, 14, 22, 0.85));
+  width: 100%;
+}
+
 #shh-root .shh-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
   min-height: 44px;
   box-sizing: border-box;
   padding: 8px 12px 6px;
-  background: linear-gradient(180deg, rgba(10, 14, 22, 0.96), rgba(10, 14, 22, 0.85));
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
   color: #e8eef7;
+}
+
+#shh-root .shh-info-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+#shh-root .shh-info-row .shh-sync {
+  display: inline-block;
+  box-sizing: border-box;
+  padding-left: 8px;
+}
+
+#shh-root .shh-info-row .shh-status {
+  display: inline-block;
+  box-sizing: border-box;
+  padding-left: 8px;
+}
+
+#shh-root .shh-info-row .shh-options-toggle-parent {
+  flex: 1;
+  text-align: right;
 }
 
 #shh-root.shh-dock-float .shh-toolbar {
@@ -168,6 +193,7 @@
     display: inline-block;
     vertical-align: top;
     margin-right: 16px;
+    margin-top: 4px;
     margin-bottom: 8px;
   }
 }

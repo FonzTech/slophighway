@@ -9,73 +9,79 @@ export function panelHtml(mode: ShellMode): string {
   const attached = mode === "attached";
   return `
     <div class="shh-panel">
-      <div class="shh-toolbar">
-        <div class="shh-brand">Slophighway v${VERSION}</div>
-        ${attached ? `<span class="shh-sync"></span>` : ""}
-        <span class="shh-status"></span>
-        <button type="button" class="shh-btn shh-options-toggle" title="Show or hide the toolbar options"></button>
-        <div class="shh-options">
-          <div class="shh-group">
-            <div class="shh-group-title">Window</div>
-            <div class="shh-group-items">
-              ${
-                attached
-                  ? `<select class="shh-select shh-dock" aria-label="Position">
-                  <option value="top">Dock Top</option>
-                  <option value="bottom">Dock Bottom</option>
-                  <option value="float">Floating</option>
+      <div class="shh-toolbar-parent">
+        <div class="shh-toolbar">
+          <div class="shh-info-row">
+            <div class="shh-brand">Slophighway v${VERSION}</div>
+            ${attached ? `<span class="shh-sync"></span>` : ""}
+            <span class="shh-status"></span>
+            <div class="shh-options-toggle-parent">
+                <button type="button" class="shh-btn shh-options-toggle" title="Show or hide the toolbar options"></button>
+            </div>
+          </div>
+          <div class="shh-options">
+            <div class="shh-group">
+              <div class="shh-group-title">Window</div>
+              <div class="shh-group-items">
+                ${
+                  attached
+                    ? `<select class="shh-select shh-dock" aria-label="Position">
+                    <option value="top">Dock Top</option>
+                    <option value="bottom">Dock Bottom</option>
+                    <option value="float">Floating</option>
+                  </select>
+                  <button type="button" class="shh-btn shh-detach" title="Open the highway in its own window (second monitor, full screen)">Detach</button>
+                  <button type="button" class="shh-btn shh-max" title="Full screen highway">Full</button>
+                  <button type="button" class="shh-btn shh-collapse" title="Hide the highway">Hide</button>`
+                    : `<button type="button" class="shh-btn shh-full" title="Full screen (or double-click the highway)">Full screen</button>`
+                }
+              </div>
+            </div>
+            <div class="shh-group">
+              <div class="shh-group-title">Track and Note Highway</div>
+              <div class="shh-group-items">
+                <select class="shh-select shh-arrangement" aria-label="Arrangement" title="Switch tracks with keys 1–9"></select>
+                <select class="shh-select shh-view" aria-label="View">
+                  <option value="3d">3D</option>
+                  <option value="2d">2D (light)</option>
                 </select>
-                <button type="button" class="shh-btn shh-detach" title="Open the highway in its own window (second monitor, full screen)">Detach</button>
-                <button type="button" class="shh-btn shh-max" title="Full screen highway">Full</button>
-                <button type="button" class="shh-btn shh-collapse" title="Hide the highway">Hide</button>`
-                  : `<button type="button" class="shh-btn shh-full" title="Full screen (or double-click the highway)">Full screen</button>`
-              }
+                <select class="shh-select shh-quality" aria-label="Quality" title="Lower quality renders fewer pixels and caps the frame rate at 60">
+                  ${qualityOptions()}
+                </select>
+                <button type="button" class="shh-btn shh-std" title="Re-fret every track for E standard tuning"></button>
+              </div>
             </div>
-          </div>
-          <div class="shh-group">
-            <div class="shh-group-title">Track and Note Highway</div>
-            <div class="shh-group-items">
-              <select class="shh-select shh-arrangement" aria-label="Arrangement" title="Switch tracks with keys 1–9"></select>
-              <select class="shh-select shh-view" aria-label="View">
-                <option value="3d">3D</option>
-                <option value="2d">2D (light)</option>
-              </select>
-              <select class="shh-select shh-quality" aria-label="Quality" title="Lower quality renders fewer pixels and caps the frame rate at 60">
-                ${qualityOptions()}
-              </select>
-              <button type="button" class="shh-btn shh-std" title="Re-fret every track for E standard tuning"></button>
+            <div class="shh-group">
+              <div class="shh-group-title">Controls and Appearance</div>
+              <div class="shh-group-items">
+                <select class="shh-select shh-touch" aria-label="Touch controls" title="Enable on-screen touch controls">
+                  <option value="yes">Touch controls: Yes</option>
+                  <option value="no">Touch controls: No</option>
+                </select>
+                <select class="shh-select shh-camera-distance" aria-label="Camera distance" title="How far the 3D camera sits from the fretboard">
+                  ${cameraDistanceOptions()}
+                </select>
+                ${attached ? `<button type="button" class="shh-btn shh-bg" title="Toggle the highway background"></button>` : ""}
+              </div>
             </div>
-          </div>
-          <div class="shh-group">
-            <div class="shh-group-title">Controls and Appearance</div>
-            <div class="shh-group-items">
-              <select class="shh-select shh-touch" aria-label="Touch controls" title="Enable on-screen touch controls">
-                <option value="yes">Touch controls: Yes</option>
-                <option value="no">Touch controls: No</option>
-              </select>
-              <select class="shh-select shh-camera-distance" aria-label="Camera distance" title="How far the 3D camera sits from the fretboard">
-                ${cameraDistanceOptions()}
-              </select>
-              ${attached ? `<button type="button" class="shh-btn shh-bg" title="Toggle the highway background"></button>` : ""}
-            </div>
-          </div>
-          <div class="shh-group">
-            <div class="shh-group-title">Chord Helpers</div>
-            <div class="shh-group-items">
-              <select class="shh-select shh-chord-shape" aria-label="Chord shape size" title="Size of the chord shape diagram at the top left">
-                ${chordShapeOptions()}
-              </select>
-              <select class="shh-select shh-next-chords" aria-label="Number of next chords" title="How many upcoming chords to list under the chord shape diagram">
-                ${nextChordsOptions()}
-              </select>
-              <select class="shh-select shh-chord-override" aria-label="Chord override" title="Act on the chord shape box">
-                <option value="no">Chord override: No</option>
-                <option value="yes">Chord override: Yes</option>
-              </select>
-              <select class="shh-select shh-show-string-notes" aria-label="Show string open notes" title="Letter each string (E A D G B e) on the chord shape box">
-                <option value="no">Show string open notes: No</option>
-                <option value="yes">Show string open notes: Yes</option>
-              </select>
+            <div class="shh-group">
+              <div class="shh-group-title">Chord Helpers</div>
+              <div class="shh-group-items">
+                <select class="shh-select shh-chord-shape" aria-label="Chord shape size" title="Size of the chord shape diagram at the top left">
+                  ${chordShapeOptions()}
+                </select>
+                <select class="shh-select shh-next-chords" aria-label="Number of next chords" title="How many upcoming chords to list under the chord shape diagram">
+                  ${nextChordsOptions()}
+                </select>
+                <select class="shh-select shh-chord-override" aria-label="Chord override" title="Act on the chord shape box">
+                  <option value="no">Chord override: No</option>
+                  <option value="yes">Chord override: Yes</option>
+                </select>
+                <select class="shh-select shh-show-string-notes" aria-label="Show string open notes" title="Letter each string (E A D G B e) on the chord shape box">
+                  <option value="no">Show string open notes: No</option>
+                  <option value="yes">Show string open notes: Yes</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
