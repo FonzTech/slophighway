@@ -68,6 +68,7 @@ export class HighwayShell {
   private readonly nextChordsSelect: HTMLSelectElement;
   private readonly cameraDistanceSelect: HTMLSelectElement;
   private readonly chordOverrideSelect: HTMLSelectElement;
+  private readonly showStringNotesSelect: HTMLSelectElement;
   private readonly stdBtn: HTMLButtonElement;
   private readonly resizeObserver: ResizeObserver;
   private readonly unwatch: () => void;
@@ -100,6 +101,7 @@ export class HighwayShell {
     this.nextChordsSelect = q(".shh-next-chords");
     this.cameraDistanceSelect = q(".shh-camera-distance");
     this.chordOverrideSelect = q(".shh-chord-override");
+    this.showStringNotesSelect = q(".shh-show-string-notes");
     this.stdBtn = q(".shh-std");
     this.optionsToggle = q(".shh-options-toggle");
     this.optionsToggle.addEventListener("click", () => {
@@ -135,6 +137,7 @@ export class HighwayShell {
     this.nextChordsSelect.value = String(s.nextChords);
     this.cameraDistanceSelect.value = s.cameraDistance;
     this.chordOverrideSelect.value = s.chordOverride ? "yes" : "no";
+    this.showStringNotesSelect.value = s.showStringOpenNotes ? "yes" : "no";
     this.stdBtn.textContent = this.standard ? "E Std: On" : "E Std: Off";
     this.stdBtn.classList.toggle("shh-on", this.standard);
     this.root.classList.toggle("shh-touch-controls", s.touchControls);
@@ -156,6 +159,7 @@ export class HighwayShell {
       if (changed.includes("nextChords")) this.view.setNextChordCount(next.nextChords);
       if (changed.includes("cameraDistance")) this.view.setCameraDistance(next.cameraDistance);
       if (changed.includes("chordOverride")) this.view.setChordOverride(next.chordOverride);
+      if (changed.includes("showStringOpenNotes")) this.view.setShowStringOpenNotes(next.showStringOpenNotes);
     }
     if (persist) void patchStored(Object.fromEntries(changed.map((k) => [k, next[k]])));
   }
@@ -238,6 +242,7 @@ export class HighwayShell {
               s.nextChords,
               s.cameraDistance,
               s.chordOverride,
+              s.showStringOpenNotes,
             )
           : new Highway2D(this.stage, this.clock, transparent);
     } catch (err) {
@@ -270,6 +275,7 @@ export class HighwayShell {
     on(this.nextChordsSelect, () => set({ nextChords: parseNextChords(this.nextChordsSelect.value) }));
     on(this.cameraDistanceSelect, () => set({ cameraDistance: parseCameraDistance(this.cameraDistanceSelect.value) }));
     on(this.chordOverrideSelect, () => set({ chordOverride: this.chordOverrideSelect.value === "yes" }));
+    on(this.showStringNotesSelect, () => set({ showStringOpenNotes: this.showStringNotesSelect.value === "yes" }));
     this.stdBtn.addEventListener("click", () => this.source.setStandard(!this.standard));
   }
 

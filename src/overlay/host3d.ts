@@ -1,5 +1,5 @@
 import type { RsArrangement } from "../songsterr/rocksmith";
-import { tuningOffsets } from "../songsterr/tuning";
+import { tuningOffsets, stringNoteLetters } from "../songsterr/tuning";
 import { applyChordOverride } from "./chordOverride";
 import type { HighwayView, PlaybackClock } from "./clock";
 
@@ -150,6 +150,7 @@ export class Highway3D implements HighwayView {
   private nextChords: number;
   private cameraDistance: CameraDistance;
   private chordOverride: boolean;
+  private showStringOpenNotes: boolean;
   private arrangement: RsArrangement | null = null;
   private lastFrame = 0;
   private frameBudget = 0;
@@ -164,6 +165,7 @@ export class Highway3D implements HighwayView {
     nextChords = 0,
     cameraDistance: CameraDistance = "normal",
     chordOverride = false,
+    showStringOpenNotes = false,
   ) {
     this.stage = stage;
     this.clock = clock;
@@ -174,6 +176,7 @@ export class Highway3D implements HighwayView {
     this.nextChords = nextChords;
     this.cameraDistance = cameraDistance;
     this.chordOverride = chordOverride;
+    this.showStringOpenNotes = showStringOpenNotes;
     this.canvas = document.createElement("canvas");
     this.canvas.className = "shh-canvas shh-canvas-3d";
     stage.appendChild(this.canvas);
@@ -233,6 +236,11 @@ export class Highway3D implements HighwayView {
     }
   }
 
+  setShowStringOpenNotes(enabled: boolean): void {
+    this.showStringOpenNotes = enabled;
+    if (this.bundle) this.bundle.showStringOpenNotes = enabled;
+  }
+
   /** The renderer multiplies this by min(devicePixelRatio, 2). */
   private renderScale(): number {
     const { pixelRatio } = this.quality;
@@ -280,6 +288,8 @@ export class Highway3D implements HighwayView {
       chordDiagramScale: CHORD_SHAPE_SCALE[this.chordShape],
       nextChordCount: this.nextChords,
       cameraDistanceMul: CAMERA_DISTANCE_FACTOR[this.cameraDistance],
+      showStringOpenNotes: this.showStringOpenNotes,
+      stringNoteLetters: stringNoteLetters(arr),
       lyricsVisible: false,
       getNoteState: () => null,
     };

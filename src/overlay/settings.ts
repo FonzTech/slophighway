@@ -25,6 +25,8 @@ export type SharedSettings = {
   optionsShown: boolean;
   /** Whether the "Chord override" feature for the chord shape box is enabled. */
   chordOverride: boolean;
+  /** Whether to letter each string (E A D G B e) in the chord shape box. */
+  showStringOpenNotes: boolean;
 };
 
 /** Storage key holding the shared settings plus the attached overlay's layout preferences. */
@@ -40,6 +42,7 @@ export function defaultSettings(): SharedSettings {
     cameraDistance: "normal",
     optionsShown: true,
     chordOverride: false,
+    showStringOpenNotes: false,
   };
 }
 
@@ -55,6 +58,8 @@ export function parseSettings(stored: Partial<Record<keyof SharedSettings, unkno
     cameraDistance: parseCameraDistance(stored?.cameraDistance),
     optionsShown: typeof stored?.optionsShown === "boolean" ? stored.optionsShown : base.optionsShown,
     chordOverride: typeof stored?.chordOverride === "boolean" ? stored.chordOverride : base.chordOverride,
+    showStringOpenNotes:
+      typeof stored?.showStringOpenNotes === "boolean" ? stored.showStringOpenNotes : base.showStringOpenNotes,
   };
 }
 

@@ -72,6 +72,10 @@ export function panelHtml(mode: ShellMode): string {
                 <option value="no">Chord override: No</option>
                 <option value="yes">Chord override: Yes</option>
               </select>
+              <select class="shh-select shh-show-string-notes" aria-label="Show string open notes" title="Letter each string (E A D G B e) on the chord shape box">
+                <option value="no">Show string open notes: No</option>
+                <option value="yes">Show string open notes: Yes</option>
+              </select>
             </div>
           </div>
         </div>

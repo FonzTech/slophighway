@@ -2969,6 +2969,8 @@
                 nStr = 6,
                 lyricsBottom = 0,
                 scale: userScale = 1,
+                showStringOpenNotes = false,
+                stringNoteLetters = [],
             } = opts;
 
             // Responsive sizing — CELL derived from panel height + user slider.
@@ -3019,7 +3021,7 @@
                 // leak to the caller (the outer ctx.save() happens after CELL is derived).
                 ctx.save();
                 ctx.font = `italic ${Math.round(cellEst * 0.55)}px sans-serif`;
-                fretLabelW = Math.ceil(ctx.measureText(startFret + 'fr').width) + 6;
+                fretLabelW = Math.ceil(ctx.measureText(String(startFret)).width) + 6;
                 ctx.restore();
             }
 
@@ -3036,6 +3038,8 @@
             ));
             const HEADER = Math.round(CELL * 1.6);
             const MARKER = Math.round(CELL * 0.7);
+            // Extra row of open-note letters between the chord name and the string markers.
+            const STR_LABEL = showStringOpenNotes ? Math.max(10, Math.round(CELL * 0.95)) : 0;
             const DOT_R  = CELL * 0.3;
             const PAD    = Math.max(6, Math.round(CELL * 0.65));
             const gridW  = CELL * (COLS - 1);
@@ -3044,7 +3048,7 @@
             const PAD_L  = PAD + fretLabelW;
 
             const boxW   = gridW + PAD_L + PAD;
-            const boxH   = HEADER + MARKER + gridH + PAD;
+            const boxH   = HEADER + STR_LABEL + MARKER + gridH + PAD;
 
             // Anchor to chosen corner. Top positions get extra vertical offset
             // to clear the timeline plugin and song name displayed at the top.
@@ -3071,7 +3075,7 @@
             // entirely rather than painting on top of the lyrics banner.
             if (lyricsBottom > 0 && by < lyricsBottom) return 0;
 
-            const gx = bx + PAD_L, gy = by + HEADER + MARKER;
+            const gx = bx + PAD_L, gy = by + HEADER + STR_LABEL + MARKER;
 
             // Ease-out quadratic entrance scale: 0.85 → 1.0.
             const scale = 1 - 0.15 * (1 - entranceT) * (1 - entranceT);
@@ -3133,7 +3137,7 @@
                 ctx.font = `italic ${Math.round(CELL * 0.55)}px sans-serif`;
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(startFret + 'fr', gx - 14, gy + CELL * 0.5);
+                ctx.fillText(String(startFret), gx - 14, gy + CELL * 0.5);
             }
 
             // Fret lines.
@@ -3248,11 +3252,40 @@
                 ctx.stroke();
             }
 
+            // String open-note letters (e.g. "EADGBe") centered in their own band between
+            // the chord name and the string markers. Case marks string register: the LOWEST
+            // occurrence of each pitch class is uppercase, every higher repeat is lowercase
+            // (standard EADGBE -> EADGBe with lowercase "e" = high E; GDDDDD -> GDdddd),
+            // so players can tell the low string from its higher octave(s).
+            if (showStringOpenNotes) {
+                const fontPx = Math.max(9, Math.round(CELL * 0.7));
+                ctx.save();
+                ctx.font = `bold ${fontPx}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const letterY = by + HEADER + STR_LABEL * 0.5;
+                // Displayed strings run low-to-high (left = low E) so the label reads like a
+                // conventional tuning, e.g. "EADGBe". The first (lowest) occurrence of each
+                // pitch class is uppercase; higher repeats are lowercase (GDDDDD -> GDdddd).
+                const seenUp = new Set();
+                for (let col = 0; col < COLS; col++) {
+                    const strIdx = getStrIdx(col);
+                    // Reverse the high-first template order so col 0 shows the low string.
+                    const letter = stringNoteLetters ? stringNoteLetters[COLS - 1 - strIdx] : undefined;
+                    if (!letter) continue;
+                    const base = letter.toUpperCase();
+                    const label = seenUp.has(base) ? base.toLowerCase() : base;
+                    seenUp.add(base);
+                    ctx.fillStyle = (strIdx === 0 || strIdx === 1) ? '#e8d080' : 'rgba(255,255,255,0.55)';
+                    ctx.fillText(label, gx + col * CELL, letterY);
+                }
+                ctx.restore();
+            }
+
             // Open/muted markers + finger dots.
             // Non-inverted: col 0 = high e → getStrIdx(0)=0 → frets[0]; col COLS-1 = low E → frets[COLS-1].
             // Inverted:     col 0 = low E → getStrIdx(0)=COLS-1 → frets[COLS-1]; col COLS-1 = high e → frets[0].
-            for (let col = 0; col < COLS; col++) {
-                const f = frets[getStrIdx(col)];
+            for (let col = 0; col < COLS; col++) {                const f = frets[getStrIdx(col)];
                 const sx = gx + col * CELL;
                 const markerY = gy - MARKER * 0.5;
                 if (f < 0) {
@@ -3292,6 +3325,7 @@
                 names, prevNames = [], progress = 1, canvasW = 600, canvasH = 400,
                 sizeSlider = 0.5, position = 'tl', nStr = 6,
                 lyricsBottom = 0, scale: userScale = 1,
+                showStringOpenNotes = false,
             } = opts;
             if (!names || (!names.length && progress >= 1)) return;
             const COLS = nStr, ROWS = 4;
@@ -3309,7 +3343,10 @@
             ));
             const PAD = Math.max(6, Math.round(CELL * 0.65));
             const boxW = CELL * (COLS - 1) + 2 * PAD;
-            const boxH = Math.round(CELL * 1.6) + Math.round(CELL * 0.7) + CELL * ROWS + PAD;
+            // Mirror the chord diagram's height (including its open-note letter band when shown)
+            // so the list always sits just below the actual diagram box.
+            const strLabel = showStringOpenNotes ? Math.max(10, Math.round(CELL * 0.95)) : 0;
+            const boxH = Math.round(CELL * 1.6) + strLabel + Math.round(CELL * 0.7) + CELL * ROWS + PAD;
             const TOP_Y = Math.round(Math.max(PAD + canvasH * 0.06, lyricsBottom + PAD));
             let bx, by;
             if      (position === 'tr') { bx = canvasW - boxW - PAD; by = TOP_Y; }
@@ -9222,6 +9259,8 @@
                             nStr: _diagPrev.nStr ?? nStr,
                             lyricsBottom,
                             scale: Number(bundle.chordDiagramScale) || 1,
+                            showStringOpenNotes: !!bundle.showStringOpenNotes,
+                            stringNoteLetters: bundle.stringNoteLetters ?? [],
                         });
                     }
                     if (_diagChord) {
@@ -9237,6 +9276,8 @@
                             nStr: _diagChord.nStr ?? nStr,
                             lyricsBottom,
                             scale: Number(bundle.chordDiagramScale) || 1,
+                            showStringOpenNotes: !!bundle.showStringOpenNotes,
+                            stringNoteLetters: bundle.stringNoteLetters ?? [],
                         });
                     }
                     drawNextChords(lyricsCtx, {
@@ -9249,6 +9290,7 @@
                         sizeSlider: chordDiagramSize, position: chordDiagramPosition,
                         nStr, lyricsBottom,
                         scale: Number(bundle.chordDiagramScale) || 1,
+                        showStringOpenNotes: !!bundle.showStringOpenNotes,
                     });
                     if (sectionHudVisible && bundle.sections && bundle.sections.length) {
                         drawSectionHud(lyricsCtx, {

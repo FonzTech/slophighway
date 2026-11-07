@@ -48,8 +48,22 @@ function baseOffset(offsets: number[]): number {
   return best;
 }
 
-export function tuningName(arr: RsArrangement): string {
+/**
+ * Open-note letter per string for the arrangement's actual tuning, high-E-first
+ * (index 0 = high e ... index strings-1 = low E), matching the renderer's chord
+ * diagram column order. Falls back to the standard names when the tuning is unknown.
+ */
+export function stringNoteLetters(arr: RsArrangement): string[] {
+  const standard = standardFor(arr);
   const tuning = lowToHigh(arr);
+  if (!standard || tuning.length !== standard.length) {
+    // No standard baseline: derive directly from the given pitches.
+    return [...(arr.tuning ?? []).map(noteName)];
+  }
+  return tuning.map(noteName).reverse();
+}
+
+export function tuningName(arr: RsArrangement): string {  const tuning = lowToHigh(arr);
   const standard = standardFor(arr);
   if (!standard || tuning.length !== standard.length) return tuning.map(noteName).join(" ");
   const offsets = tuning.map((midi, i) => midi - standard[i]);
