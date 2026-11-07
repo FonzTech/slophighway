@@ -189,7 +189,7 @@ export function mountOverlay(): OverlayController {
   const clock = new PlaybackClock();
   const badge = new TrackBadge(stage);
   const info = new SongInfoBox(stage);
-  mountControlsLegend(stage);
+  const barReadout = mountControlsLegend(stage, clock);
   const touchNav = mountTouchNav(stage);
   const touchNavBtns = [...touchNav.querySelectorAll<HTMLButtonElement>(".shh-touch-nav-btn")];
   const dispatchArrow = (arrow: HTMLButtonElement) => {
@@ -336,6 +336,7 @@ export function mountOverlay(): OverlayController {
     if (current) badge.show(arrangements.indexOf(current), current.name, flash);
     else badge.clear();
     info.setArrangement(arr);
+    barReadout.setArrangement(arr);
     view?.setArrangement(arr);
     sendDetached({ type: "arrangement", arrangement: arr });
   };
@@ -587,6 +588,7 @@ export function mountOverlay(): OverlayController {
       ports.clear();
       window.removeEventListener("resize", onWindowResize);
       view?.destroy();
+      barReadout.destroy();
       root.remove();
     },
   };

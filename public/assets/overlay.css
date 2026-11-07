@@ -276,6 +276,7 @@
   pointer-events: none;
 }
 
+#shh-root .shh-controls-legend b,
 #shh-root .shh-controls-legend kbd {
   display: inline-block;
   min-width: 26px;
@@ -288,7 +289,7 @@
   display: none;
   position: absolute;
   left: 10px;
-  bottom: 62px;
+  bottom: 72px;
   z-index: 4;
   gap: 8px;
   pointer-events: none;

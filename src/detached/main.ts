@@ -23,7 +23,7 @@ const status = document.querySelector(".shh-status") as HTMLSpanElement;
 const clock = new PlaybackClock();
 const badge = new TrackBadge(stage);
 const info = new SongInfoBox(stage);
-mountControlsLegend(stage, [["2× click", "full screen"]]);
+const barReadout = mountControlsLegend(stage, clock, [["2× click", "full screen"]]);
 let viewMode: ViewMode = webgl2Available() ? "3d" : "2d";
 let quality: Quality = "balanced";
 let standard = false;
@@ -121,6 +121,7 @@ function onMessage(msg: ToDetached): void {
         badge.clear();
       }
       info.setArrangement(arrangement);
+      barReadout.setArrangement(arrangement);
       view?.setArrangement(arrangement);
       break;
     }

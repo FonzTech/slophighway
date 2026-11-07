@@ -1,3 +1,4 @@
+import type { PlaybackClock } from "./clock";
 import type { RsArrangement } from "../songsterr/rocksmith";
 import { tuningName } from "../songsterr/tuning";
 
@@ -78,8 +79,66 @@ export class TrackBadge {
   }
 }
 
+/** "Current Bar: X / Y" line in the controls legend, driven by the playback clock. */
+export class BarReadout {
+  private el: HTMLDivElement;
+  private value: Text;
+  private downbeats: { time: number; measure: number }[] = [];
+  private total = 0;
+  private shown = "";
+  private raf = 0;
+
+  constructor(container: HTMLElement, private clock: PlaybackClock) {
+    this.el = document.createElement("div");
+    const label = document.createElement("b");
+    label.textContent = "Current Bar:";
+    this.value = document.createTextNode("");
+    this.el.append(label, this.value);
+    container.appendChild(this.el);
+    this.render(0);
+    const loop = () => {
+      this.raf = requestAnimationFrame(loop);
+      this.render(this.clock.nowMs() / 1000);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  setArrangement(arr: RsArrangement | null): void {
+    this.downbeats = (arr?.beats ?? []).filter((b) => b.measure > 0);
+    this.total = this.downbeats.reduce((max, b) => Math.max(max, b.measure), 0);
+    this.render(this.clock.nowMs() / 1000);
+  }
+
+  destroy(): void {
+    cancelAnimationFrame(this.raf);
+    this.el.remove();
+  }
+
+  private render(timeSec: number): void {
+    // binary search for the last bar starting at or before the seek position
+    let lo = 0;
+    let hi = this.downbeats.length - 1;
+    let cur = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (this.downbeats[mid].time <= timeSec) {
+        cur = this.downbeats[mid].measure;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    const text = ` ${cur} / ${this.total}`;
+    if (text === this.shown) return;
+    this.shown = text;
+    this.value.textContent = text;
+  }
+}
+
 /** Small keyboard cheat sheet in the bottom-left corner of the highway. */
-export function mountControlsLegend(stage: HTMLElement, extra: [key: string, action: string][] = []): void {
+export function mountControlsLegend(
+  stage: HTMLElement,
+  clock: PlaybackClock,
+  extra: [key: string, action: string][] = [],
+): BarReadout {
   const el = document.createElement("div");
   el.className = "shh-controls-legend";
   const rows: [string, string][] = [["1–9", "track"], ["Space", "play / pause"], ...extra];
@@ -91,6 +150,7 @@ export function mountControlsLegend(stage: HTMLElement, extra: [key: string, act
     el.appendChild(row);
   }
   stage.appendChild(el);
+  return new BarReadout(el, clock);
 }
 
 /** On-screen left/right navigation buttons, above the keyboard legend at the bottom-left of the highway. */
