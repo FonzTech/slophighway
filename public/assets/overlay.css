@@ -142,8 +142,20 @@
   white-space: nowrap;
 }
 
+#shh-root .shh-options-toggle {
+  margin-left: auto;
+}
+
 #shh-root .shh-options {
-  display: contents;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+#shh-root .shh-options > button,
+#shh-root .shh-options > select {
+  margin-bottom: 10px;
+  margin-right: 10px;
 }
 
 #shh-root.shh-options-hidden .shh-options {
@@ -160,6 +172,10 @@
   font-size: 12px;
   font-family: inherit;
   cursor: pointer;
+}
+
+#shh-root .shh-btn {
+  text-align: left;
 }
 
 #shh-root .shh-arrangement {
@@ -179,7 +195,6 @@
 }
 
 #shh-root .shh-status {
-  margin-left: auto;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;

@@ -12,8 +12,8 @@ export function panelHtml(mode: ShellMode): string {
       <div class="shh-toolbar">
         <div class="shh-brand">Slophighway v${VERSION}</div>
         ${attached ? `<span class="shh-sync"></span>` : ""}
-        <button type="button" class="shh-btn shh-options-toggle" title="Show or hide the toolbar options"></button>
         <span class="shh-status"></span>
+        <button type="button" class="shh-btn shh-options-toggle" title="Show or hide the toolbar options"></button>
         <div class="shh-options">
         <select class="shh-select shh-arrangement" aria-label="Arrangement" title="Switch tracks with keys 1–9"></select>
         <select class="shh-select shh-view" aria-label="View">
