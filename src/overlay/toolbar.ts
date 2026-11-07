@@ -11,6 +11,10 @@ export function panelHtml(mode: ShellMode): string {
     <div class="shh-panel">
       <div class="shh-toolbar">
         <div class="shh-brand">Slophighway v${VERSION}</div>
+        ${attached ? `<span class="shh-sync"></span>` : ""}
+        <button type="button" class="shh-btn shh-options-toggle" title="Show or hide the toolbar options"></button>
+        <span class="shh-status"></span>
+        <div class="shh-options">
         <select class="shh-select shh-arrangement" aria-label="Arrangement" title="Switch tracks with keys 1–9"></select>
         <select class="shh-select shh-view" aria-label="View">
           <option value="3d">3D</option>
@@ -43,11 +47,10 @@ export function panelHtml(mode: ShellMode): string {
         <button type="button" class="shh-btn shh-detach" title="Open the highway in its own window (second monitor, full screen)">Detach</button>
         <button type="button" class="shh-btn shh-bg" title="Toggle the highway background"></button>
         <button type="button" class="shh-btn shh-max" title="Full screen highway">Full</button>
-        <button type="button" class="shh-btn shh-collapse" title="Hide the highway">Hide</button>
-        <span class="shh-sync"></span>`
+        <button type="button" class="shh-btn shh-collapse" title="Hide the highway">Hide</button>`
             : `<button type="button" class="shh-btn shh-full" title="Full screen (or double-click the highway)">Full screen</button>`
         }
-        <span class="shh-status"></span>
+        </div>
       </div>
       <div class="shh-stage"></div>
       ${attached ? `<div class="shh-resize" title="Drag to resize"></div>` : ""}

@@ -91,6 +91,7 @@ fullBtn.addEventListener("click", toggleFullscreen);
 shell.stage.addEventListener("dblclick", toggleFullscreen);
 document.addEventListener("fullscreenchange", layout);
 window.addEventListener("resize", layout);
+new ResizeObserver(layout).observe(shell.toolbar);
 
 layout();
 if (Number.isFinite(tabId)) connect();

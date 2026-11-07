@@ -142,6 +142,14 @@
   white-space: nowrap;
 }
 
+#shh-root .shh-options {
+  display: contents;
+}
+
+#shh-root.shh-options-hidden .shh-options {
+  display: none;
+}
+
 #shh-root .shh-select,
 #shh-root .shh-btn {
   background: #152033;
