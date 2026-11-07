@@ -75,7 +75,6 @@ export class HighwayShell {
   private arrangement: RsArrangement | null = null;
   private standard = false;
   private suspended = false;
-  private optionsShown = false;
   private readonly optionsToggle: HTMLButtonElement;
   private repeatDelay: number | undefined;
   private repeatTimer: number | undefined;
@@ -102,8 +101,7 @@ export class HighwayShell {
     this.stdBtn = q(".shh-std");
     this.optionsToggle = q(".shh-options-toggle");
     this.optionsToggle.addEventListener("click", () => {
-      this.optionsShown = !this.optionsShown;
-      this.syncControls();
+      this.applySettings({ ...this.settings, optionsShown: !this.settings.optionsShown }, true);
     });
 
     if (!webgl2Available()) this.viewSelect.querySelector('option[value="3d"]')?.setAttribute("disabled", "");
@@ -137,8 +135,8 @@ export class HighwayShell {
     this.stdBtn.textContent = this.standard ? "E Std: on" : "E Std: off";
     this.stdBtn.classList.toggle("shh-on", this.standard);
     this.root.classList.toggle("shh-touch-controls", s.touchControls);
-    this.root.classList.toggle("shh-options-hidden", !this.optionsShown);
-    this.optionsToggle.textContent = this.optionsShown ? "Hide Options" : "Show Options";
+    this.root.classList.toggle("shh-options-hidden", !s.optionsShown);
+    this.optionsToggle.textContent = s.optionsShown ? "Hide Options" : "Show Options";
   }
 
   /** Applies new shared settings to the controls and the live view; `persist` writes them to storage. */

@@ -21,6 +21,8 @@ export type SharedSettings = {
   chordShape: ChordShapeSize;
   nextChords: number;
   cameraDistance: CameraDistance;
+  /** Whether the toolbar's advanced options group is expanded. */
+  optionsShown: boolean;
 };
 
 /** Storage key holding the shared settings plus the attached overlay's layout preferences. */
@@ -34,6 +36,7 @@ export function defaultSettings(): SharedSettings {
     chordShape: "normal",
     nextChords: 0,
     cameraDistance: "normal",
+    optionsShown: true,
   };
 }
 
@@ -47,6 +50,7 @@ export function parseSettings(stored: Partial<Record<keyof SharedSettings, unkno
     chordShape: parseChordShapeSize(stored?.chordShape),
     nextChords: parseNextChords(stored?.nextChords),
     cameraDistance: parseCameraDistance(stored?.cameraDistance),
+    optionsShown: typeof stored?.optionsShown === "boolean" ? stored.optionsShown : base.optionsShown,
   };
 }
 
