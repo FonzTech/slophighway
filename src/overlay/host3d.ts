@@ -1,5 +1,6 @@
 import type { RsArrangement } from "../songsterr/rocksmith";
 import { tuningOffsets } from "../songsterr/tuning";
+import { applyChordOverride } from "./chordOverride";
 import type { HighwayView, PlaybackClock } from "./clock";
 
 type SlopsmithRenderer = {
@@ -148,6 +149,8 @@ export class Highway3D implements HighwayView {
   private chordShape: ChordShapeSize;
   private nextChords: number;
   private cameraDistance: CameraDistance;
+  private chordOverride: boolean;
+  private arrangement: RsArrangement | null = null;
   private lastFrame = 0;
   private frameBudget = 0;
 
@@ -160,6 +163,7 @@ export class Highway3D implements HighwayView {
     chordShape: ChordShapeSize = "normal",
     nextChords = 0,
     cameraDistance: CameraDistance = "normal",
+    chordOverride = false,
   ) {
     this.stage = stage;
     this.clock = clock;
@@ -169,6 +173,7 @@ export class Highway3D implements HighwayView {
     this.chordShape = chordShape;
     this.nextChords = nextChords;
     this.cameraDistance = cameraDistance;
+    this.chordOverride = chordOverride;
     this.canvas = document.createElement("canvas");
     this.canvas.className = "shh-canvas shh-canvas-3d";
     stage.appendChild(this.canvas);
@@ -183,6 +188,7 @@ export class Highway3D implements HighwayView {
     }
     // The renderer re-reads notes, string count and tuning from the bundle every frame and keys its
     // caches on array identity, so swapping the data in place switches tracks without rebuilding the scene.
+    this.arrangement = arr;
     if (this.renderer && this.bundle) {
       Object.assign(this.bundle, this.makeBundle(arr), { currentTime: this.bundle.currentTime });
       return;
@@ -218,6 +224,15 @@ export class Highway3D implements HighwayView {
     if (this.bundle) this.bundle.nextChordCount = count;
   }
 
+  setChordOverride(enabled: boolean): void {
+    this.chordOverride = enabled;
+    // Chord templates are resolved at bundle build time; re-emit the current
+    // bundle so the corrected fingerings reach the renderer.
+    if (this.bundle && this.arrangement) {
+      Object.assign(this.bundle, this.makeBundle(this.arrangement), { currentTime: this.bundle.currentTime });
+    }
+  }
+
   /** The renderer multiplies this by min(devicePixelRatio, 2). */
   private renderScale(): number {
     const { pixelRatio } = this.quality;
@@ -248,7 +263,7 @@ export class Highway3D implements HighwayView {
       anchors: [],
       beats: arr.beats,
       sections: arr.sections,
-      chordTemplates: arr.chordTemplates,
+      chordTemplates: applyChordOverride(arr, arr.chordTemplates, this.chordOverride),
       stringCount: arr.strings,
       tuning,
       capo: arr.capo,

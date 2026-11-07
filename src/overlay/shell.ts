@@ -155,6 +155,7 @@ export class HighwayShell {
       if (changed.includes("chordShape")) this.view.setChordShapeSize(next.chordShape);
       if (changed.includes("nextChords")) this.view.setNextChordCount(next.nextChords);
       if (changed.includes("cameraDistance")) this.view.setCameraDistance(next.cameraDistance);
+      if (changed.includes("chordOverride")) this.view.setChordOverride(next.chordOverride);
     }
     if (persist) void patchStored(Object.fromEntries(changed.map((k) => [k, next[k]])));
   }
@@ -236,6 +237,7 @@ export class HighwayShell {
               s.chordShape,
               s.nextChords,
               s.cameraDistance,
+              s.chordOverride,
             )
           : new Highway2D(this.stage, this.clock, transparent);
     } catch (err) {
