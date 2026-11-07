@@ -496,6 +496,8 @@
     const DIAG_LINGER_S    = 10;
     const DIAG_FADEOUT_S   = 0.3;
     const NEXT_CHORDS_ANIM_S = 0.25;
+    // Longest a chord name stays at the hit line on the highway while waiting for the next named chord.
+    const CHORD_NAME_HOLD_S = 10;
     // Fully opaque until the last DIAG_FADEOUT_S of the linger window; dt = chord.t - now (<= 0).
     const diagLingerOpacity = (dt) => Math.max(0, Math.min(1, (DIAG_LINGER_S + dt) / DIAG_FADEOUT_S));
     const DIAG_ENTRANCE_S  = 0.20;
@@ -6566,6 +6568,16 @@
                 let prevChordSig = null;
                 let prevChordTime = -1;
 
+                // Latest named chord already hit: its name stays on the highway until the next named chord is hit.
+                let heldNameIdx = -1;
+                for (let hi = chords.length - 1; hi >= 0; hi--) {
+                    const hc = chords[hi];
+                    if (hc.t > now) continue;
+                    if (now - hc.t > CHORD_NAME_HOLD_S) break;
+                    if (!hc.notes || filterValidNotes(hc.notes).length === 0) continue;
+                    if (chordTemplateLabel(bundle.chordTemplates?.[hc.id])) { heldNameIdx = hi; break; }
+                }
+
                 for (let ci = 0; ci < chords.length; ci++) {
                     const ch = chords[ci];
                     const runSig = chordShapeSignature(ch);
@@ -6604,7 +6616,7 @@
 
                     let maxSus = 0;
                     for (const n of chordNotes) if ((n.sus || 0) > maxSus) maxSus = n.sus;
-                    if (ch.t + maxSus < ndVerdictT0 || ch.t > t1) continue;
+                    if ((ch.t + maxSus < ndVerdictT0 && ci !== heldNameIdx) || ch.t > t1) continue;
 
                     // Repeat-chord detection (consecutive same shape, short gap).
                     // Reuses runSig computed at loop entry — same signature as the
@@ -6834,15 +6846,14 @@
                     const chordTailMul = hwyPostHitTailFadeMul(chDt, chordTailHoldS, chordNextSoon, chordTailFadeS);
                     if (
                         chordName &&
-                        chDt > -chordTailHoldS &&
-                        chDt < AHEAD
+                        (chDt > 0 ? chDt < AHEAD : ci === heldNameIdx)
                     ) {
                         const lblW = 28 * K, lblH = 9 * K;
                         const lbl = pChordLbl.get();
                         const mat = txtMat(chordName, '#e8d080', true, 'chord');
                         if (lbl.material.map !== mat.map) { lbl.material.map = mat.map; lbl.material.needsUpdate = true; }
                         const fade = Math.max(0, 1 - chDt / AHEAD);
-                        lbl.material.opacity = Math.min(1, 0.3 + fade * 0.7) * chordTailMul;
+                        lbl.material.opacity = Math.min(1, 0.3 + fade * 0.7) * (ci === heldNameIdx ? 1 : chordTailMul);
                         const lblWS = lblW * _textSizeMul;
                         const lblHS = lblH * _textSizeMul;
                         const frameLeft = chordFrameXL ?? chordCX - openNoteLaneBoxW(ch.t) * 0.5;
