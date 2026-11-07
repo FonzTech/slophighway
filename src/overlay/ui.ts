@@ -13,7 +13,7 @@ import {
   type ChordShapeSize,
   type Quality,
 } from "./host3d";
-import { mountControlsLegend, mountTouchNav, SongInfoBox, TrackBadge, trackHotkey, trackLabel, type SongInfo } from "./tracks";
+import { mountControlsLegend, SongInfoBox, TrackBadge, trackHotkey, trackLabel, type SongInfo } from "./tracks";
 
 export type OverlayController = {
   /** `preferredPartId` is the part Songsterr is showing; a manual pick in the overlay wins over it. */
@@ -50,18 +50,18 @@ const PREFS_KEY = "shh-prefs";
 const MIN_HEIGHT = 120;
 const MIN_FLOAT_WIDTH = 360;
 const VERSION = "0.6.2";
-/** Hold time before a touch arrow button starts auto-repeating. */
+/** Hold time before a held side tap starts auto-repeating. */
 const TOUCH_REPEAT_DELAY_MS = 300;
-/** Fixed interval between auto-repeat presses while a touch arrow button is held. */
+/** Fixed interval between auto-repeat presses while a side tap is held. */
 const TOUCH_REPEAT_INTERVAL_MS = 100;
 /** Tap zone (0–1 fraction of width) that counts as the touch play/pause button: min x. */
-const TOUCH_PLAY_MIN_X = 0.3;
+const TOUCH_PLAY_MIN_X = 0.333;
 /** Tap zone (0–1 fraction of width) that counts as the touch play/pause button: max x. */
-const TOUCH_PLAY_MAX_X = 0.6;
+const TOUCH_PLAY_MAX_X = 0.666;
 /** Tap zone (0–1 fraction of height) that counts as the touch play/pause button: min y. */
-const TOUCH_PLAY_MIN_Y = 0.3;
+const TOUCH_PLAY_MIN_Y = 0.333;
 /** Tap zone (0–1 fraction of height) that counts as the touch play/pause button: max y. */
-const TOUCH_PLAY_MAX_Y = 0.6;
+const TOUCH_PLAY_MAX_Y = 0.666;
 
 function defaultFloat(): FloatRect {
   const w = Math.round(window.innerWidth * 0.6);
@@ -190,48 +190,32 @@ export function mountOverlay(): OverlayController {
   const badge = new TrackBadge(stage);
   const info = new SongInfoBox(stage);
   const barReadout = mountControlsLegend(stage, clock);
-  const touchNav = mountTouchNav(stage);
-  const touchNavBtns = [...touchNav.querySelectorAll<HTMLButtonElement>(".shh-touch-nav-btn")];
-  const dispatchArrow = (arrow: HTMLButtonElement) => {
-    const key = arrow.classList.contains("shh-arrow-right") ? "ArrowRight" : "ArrowLeft";
+  const dispatchArrow = (key: "ArrowLeft" | "ArrowRight") => {
+    const keyCode = key === "ArrowRight" ? 39 : 37;
     document.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key,
-        code: key,
-        keyCode: key === "ArrowRight" ? 39 : 37,
-        which: key === "ArrowRight" ? 39 : 37,
-        bubbles: true,
-        cancelable: true,
-      }),
+      new KeyboardEvent("keydown", { key, code: key, keyCode, which: keyCode, bubbles: true, cancelable: true }),
     );
   };
-  touchNavBtns.forEach((arrow) => {
-    let repeatDelay: number | undefined;
-    let repeatTimer: number | undefined;
-    const stopRepeat = () => {
-      if (repeatDelay !== undefined) {
-        clearTimeout(repeatDelay);
-        repeatDelay = undefined;
-      }
-      if (repeatTimer !== undefined) {
-        clearInterval(repeatTimer);
-        repeatTimer = undefined;
-      }
-    };
-    arrow.addEventListener("pointerdown", (e) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      stopRepeat();
-      dispatchArrow(arrow);
-      repeatDelay = window.setTimeout(() => {
-        repeatDelay = undefined;
-        repeatTimer = window.setInterval(() => dispatchArrow(arrow), TOUCH_REPEAT_INTERVAL_MS);
-      }, TOUCH_REPEAT_DELAY_MS);
-    });
-    arrow.addEventListener("contextmenu", (e) => e.preventDefault());
-    for (const stop of ["pointerup", "pointerleave", "pointercancel"]) {
-      arrow.addEventListener(stop, stopRepeat);
+  let repeatDelay: number | undefined;
+  let repeatTimer: number | undefined;
+  const stopRepeat = () => {
+    if (repeatDelay !== undefined) {
+      clearTimeout(repeatDelay);
+      repeatDelay = undefined;
     }
-  });
+    if (repeatTimer !== undefined) {
+      clearInterval(repeatTimer);
+      repeatTimer = undefined;
+    }
+  };
+  const startRepeat = (key: "ArrowLeft" | "ArrowRight") => {
+    stopRepeat();
+    dispatchArrow(key);
+    repeatDelay = window.setTimeout(() => {
+      repeatDelay = undefined;
+      repeatTimer = window.setInterval(() => dispatchArrow(key), TOUCH_REPEAT_INTERVAL_MS);
+    }, TOUCH_REPEAT_DELAY_MS);
+  };
   let prefs = defaultPrefs();
   let view: HighwayView | null = null;
   let arrangements: RsArrangement[] = [];
@@ -423,17 +407,26 @@ export function mountOverlay(): OverlayController {
 
   stage.addEventListener("pointerdown", (e) => {
     if (!prefs.touchControls) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     const w = stage.clientWidth;
     const h = stage.clientHeight;
     if (!w || !h) return;
-    const nx = e.clientX - stage.getBoundingClientRect().left;
-    const ny = e.clientY - stage.getBoundingClientRect().top;
-    const inCenterCell =
-      nx >= w * TOUCH_PLAY_MIN_X &&
-      nx <= w * TOUCH_PLAY_MAX_X &&
-      ny >= h * TOUCH_PLAY_MIN_Y &&
-      ny <= h * TOUCH_PLAY_MAX_Y;
-    if (inCenterCell) togglePlayback();
+    const rect = stage.getBoundingClientRect();
+    const nx = e.clientX - rect.left;
+    const ny = e.clientY - rect.top;
+    if (nx < w * TOUCH_PLAY_MIN_X) {
+      startRepeat("ArrowLeft");
+    } else if (nx > w * TOUCH_PLAY_MAX_X) {
+      startRepeat("ArrowRight");
+    } else if (ny >= h * TOUCH_PLAY_MIN_Y && ny <= h * TOUCH_PLAY_MAX_Y) {
+      togglePlayback();
+    }
+  });
+  for (const stop of ["pointerup", "pointerleave", "pointercancel"]) {
+    stage.addEventListener(stop, stopRepeat);
+  }
+  stage.addEventListener("contextmenu", (e) => {
+    if (prefs.touchControls) e.preventDefault();
   });
 
   const onConnect = (port: chrome.runtime.Port) => {
@@ -587,6 +580,7 @@ export function mountOverlay(): OverlayController {
       for (const port of ports) port.disconnect();
       ports.clear();
       window.removeEventListener("resize", onWindowResize);
+      stopRepeat();
       view?.destroy();
       barReadout.destroy();
       root.remove();

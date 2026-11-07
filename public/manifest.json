@@ -27,7 +27,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["vendor/three/three.module.min.js", "img/chevron_left.png", "img/chevron_right.png"],
+      "resources": ["vendor/three/three.module.min.js"],
       "matches": ["*://www.songsterr.com/*", "*://songsterr.com/*"]
     }
   ],

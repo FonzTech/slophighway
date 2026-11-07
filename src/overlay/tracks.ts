@@ -153,23 +153,6 @@ export function mountControlsLegend(
   return new BarReadout(el, clock);
 }
 
-/** On-screen left/right navigation buttons, above the keyboard legend at the bottom-left of the highway. */
-export function mountTouchNav(stage: HTMLElement): HTMLElement {
-  const el = document.createElement("div");
-  el.className = "shh-touch-nav";
-  for (const side of ["left", "right"] as const) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `shh-touch-nav-btn shh-arrow-${side}`;
-    btn.setAttribute("aria-label", side === "left" ? "Left" : "Right");
-    // content-script CSS url()s resolve against the page, so point at the extension file directly
-    btn.style.backgroundImage = `url("${chrome.runtime.getURL(`img/chevron_${side}.png`)}")`;
-    el.appendChild(btn);
-  }
-  stage.appendChild(el);
-  return el;
-}
-
 /** Zero-based track index for an unmodified 1–9 key press outside editable fields, else null. */
 export function trackHotkey(e: KeyboardEvent): number | null {
   if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.repeat) return null;
