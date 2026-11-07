@@ -3,7 +3,16 @@ import type { RsArrangement } from "../songsterr/rocksmith";
 import { retuneToStandard } from "../songsterr/tuning";
 import { PlaybackClock, type HighwayView } from "./clock";
 import { Highway2D } from "./highway";
-import { Highway3D, hasTouchSupport, parseQuality, qualityOptions, webgl2Available, type Quality } from "./host3d";
+import {
+  Highway3D,
+  chordShapeOptions,
+  hasTouchSupport,
+  parseChordShapeSize,
+  parseQuality,
+  qualityOptions, webgl2Available,
+  type ChordShapeSize,
+  type Quality,
+} from "./host3d";
 import { mountControlsLegend, mountTouchNav, SongInfoBox, TrackBadge, trackHotkey, trackLabel, type SongInfo } from "./tracks";
 
 export type OverlayController = {
@@ -33,6 +42,8 @@ type Prefs = {
   standard: boolean;
   /** Enable on-screen touch controls (behavior to be defined). */
   touchControls: boolean;
+  /** Size of the chord shape diagram at the top left of the highway. */
+  chordShape: ChordShapeSize;
 };
 
 const PREFS_KEY = "shh-prefs";
@@ -70,6 +81,7 @@ function defaultPrefs(): Prefs {
     quality: "balanced",
     standard: false,
     touchControls: hasTouchSupport(),
+    chordShape: "normal",
   };
 }
 
@@ -82,6 +94,7 @@ async function loadPrefs(): Promise<Prefs> {
       ...stored,
       float: { ...base.float, ...stored?.float },
       quality: parseQuality(stored?.quality),
+      chordShape: parseChordShapeSize(stored?.chordShape),
     };
   } catch {
     return base;
@@ -129,6 +142,9 @@ export function mountOverlay(): OverlayController {
           <option value="yes">Touch controls: yes</option>
           <option value="no">Touch controls: no</option>
         </select>
+        <select class="shh-select shh-chord-shape" aria-label="Chord shape size" title="Size of the chord shape diagram at the top left">
+          ${chordShapeOptions()}
+        </select>
         <button type="button" class="shh-btn shh-std" title="Re-fret every track for E standard tuning"></button>
         <select class="shh-select shh-dock" aria-label="Position">
           <option value="top">Dock top</option>
@@ -157,6 +173,7 @@ export function mountOverlay(): OverlayController {
   const dockSelect = root.querySelector(".shh-dock") as HTMLSelectElement;
   const qualitySelect = root.querySelector(".shh-quality") as HTMLSelectElement;
   const touchSelect = root.querySelector(".shh-touch") as HTMLSelectElement;
+  const chordShapeSelect = root.querySelector(".shh-chord-shape") as HTMLSelectElement;
   const stdBtn = root.querySelector(".shh-std") as HTMLButtonElement;
   const detachBtn = root.querySelector(".shh-detach") as HTMLButtonElement;
   const bgBtn = root.querySelector(".shh-bg") as HTMLButtonElement;
@@ -281,6 +298,7 @@ export function mountOverlay(): OverlayController {
     dockSelect.value = prefs.dock;
     qualitySelect.value = prefs.quality;
     touchSelect.value = prefs.touchControls ? "yes" : "no";
+    chordShapeSelect.value = prefs.chordShape;
     stdBtn.textContent = prefs.standard ? "E Std: on" : "E Std: off";
     stdBtn.classList.toggle("shh-on", prefs.standard);
     detachBtn.textContent = detached() ? "Attach" : "Detach";
@@ -298,7 +316,7 @@ export function mountOverlay(): OverlayController {
     try {
       view =
         prefs.view === "3d" && webgl2Available()
-          ? new Highway3D(stage, clock, (text) => (status.textContent = text), prefs.transparent, prefs.quality)
+          ? new Highway3D(stage, clock, (text) => (status.textContent = text), prefs.transparent, prefs.quality, prefs.chordShape)
           : new Highway2D(stage, clock, prefs.transparent);
     } catch (err) {
       console.error("[slophighway] view init failed", err);
@@ -345,6 +363,11 @@ export function mountOverlay(): OverlayController {
 
   touchSelect.addEventListener("change", () => {
     update({ touchControls: touchSelect.value === "yes" });
+  });
+
+  chordShapeSelect.addEventListener("change", () => {
+    update({ chordShape: parseChordShapeSize(chordShapeSelect.value) });
+    if (view instanceof Highway3D) view.setChordShapeSize(prefs.chordShape);
   });
 
   const pickTrack = (partId: number) => {
@@ -495,10 +518,14 @@ export function mountOverlay(): OverlayController {
     const rebuild = loaded.view !== prefs.view || loaded.transparent !== prefs.transparent;
     const restandard = loaded.standard !== prefs.standard;
     const requality = loaded.quality !== prefs.quality;
+    const reshape = loaded.chordShape !== prefs.chordShape;
     prefs = loaded;
     applyLayout();
     if (rebuild) createView();
-    else if (requality && view instanceof Highway3D) view.setQuality(prefs.quality);
+    else if (view instanceof Highway3D) {
+      if (requality) view.setQuality(prefs.quality);
+      if (reshape) view.setChordShapeSize(prefs.chordShape);
+    }
     if (restandard) publishCurrent(false);
   });
 

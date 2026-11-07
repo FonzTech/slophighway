@@ -51,6 +51,33 @@ export function parseQuality(value: unknown): Quality {
   return value === "high" || value === "performance" ? value : "balanced";
 }
 
+export type ChordShapeSize = "normal" | "big" | "bigger" | "biggest";
+
+/** Scale applied to the chord shape diagram (top left) for each size option; 1 is the renderer's own size. */
+export const CHORD_SHAPE_SCALE: Record<ChordShapeSize, number> = {
+  normal: 1,
+  big: 1.5,
+  bigger: 2,
+  biggest: 3,
+};
+
+export const CHORD_SHAPE_LABELS: Record<ChordShapeSize, string> = {
+  normal: "Chord shape size: Normal",
+  big: "Chord shape size: Big",
+  bigger: "Chord shape size: Bigger",
+  biggest: "Chord shape size: Biggest",
+};
+
+export function chordShapeOptions(): string {
+  return (Object.keys(CHORD_SHAPE_LABELS) as ChordShapeSize[])
+    .map((c) => `<option value="${c}">${CHORD_SHAPE_LABELS[c]}</option>`)
+    .join("");
+}
+
+export function parseChordShapeSize(value: unknown): ChordShapeSize {
+  return value === "big" || value === "bigger" || value === "biggest" ? value : "normal";
+}
+
 export function webgl2Available(): boolean {
   try {
     return !!document.createElement("canvas").getContext("webgl2");
@@ -74,6 +101,7 @@ export class Highway3D implements HighwayView {
   private onStatus: (text: string) => void;
   private transparent: boolean;
   private quality: QualitySpec;
+  private chordShape: ChordShapeSize;
   private lastFrame = 0;
   private frameBudget = 0;
 
@@ -83,12 +111,14 @@ export class Highway3D implements HighwayView {
     onStatus: (text: string) => void,
     transparent = false,
     quality: Quality = "balanced",
+    chordShape: ChordShapeSize = "normal",
   ) {
     this.stage = stage;
     this.clock = clock;
     this.onStatus = onStatus;
     this.transparent = transparent;
     this.quality = QUALITY[quality];
+    this.chordShape = chordShape;
     this.canvas = document.createElement("canvas");
     this.canvas.className = "shh-canvas shh-canvas-3d";
     stage.appendChild(this.canvas);
@@ -121,6 +151,11 @@ export class Highway3D implements HighwayView {
       this.stopRenderer();
       this.start();
     }
+  }
+
+  setChordShapeSize(size: ChordShapeSize): void {
+    this.chordShape = size;
+    if (this.bundle) this.bundle.chordDiagramScale = CHORD_SHAPE_SCALE[size];
   }
 
   /** The renderer multiplies this by min(devicePixelRatio, 2). */
@@ -167,6 +202,7 @@ export class Highway3D implements HighwayView {
       inverted: false,
       lefty: false,
       renderScale: this.renderScale(),
+      chordDiagramScale: CHORD_SHAPE_SCALE[this.chordShape],
       lyricsVisible: false,
       getNoteState: () => null,
     };

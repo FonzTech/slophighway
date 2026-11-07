@@ -2949,6 +2949,7 @@
                 position = 'tl',
                 nStr = 6,
                 lyricsBottom = 0,
+                scale: userScale = 1,
             } = opts;
 
             // Responsive sizing — CELL derived from panel height + user slider.
@@ -2988,8 +2989,8 @@
             const isTopCorner = position === 'tl' || position === 'tr';
             const availH  = canvasH - (isTopCorner ? lyricsBottom : 0);
             const cellEst = Math.max(1, Math.min(
-                Math.round(availH * sizeF / (ROWS + 3)),
-                DIAG_CELL_MAX,
+                Math.round(availH * sizeF * userScale / (ROWS + 3)),
+                DIAG_CELL_MAX * userScale,
             ));
             // Extra left padding for the "Nfr" label on non-first-position chords.
             // Measured with ctx.measureText at cellEst so the estimate is exact.
@@ -3113,7 +3114,7 @@
                 ctx.font = `italic ${Math.round(CELL * 0.55)}px sans-serif`;
                 ctx.textAlign = 'right';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(startFret + 'fr', gx - 4, gy + CELL * 0.5);
+                ctx.fillText(startFret + 'fr', gx - 14, gy + CELL * 0.5);
             }
 
             // Fret lines.
@@ -9099,6 +9100,7 @@
                             sizeSlider: chordDiagramSize, position: chordDiagramPosition,
                             nStr: _diagPrev.nStr ?? nStr,
                             lyricsBottom,
+                            scale: Number(bundle.chordDiagramScale) || 1,
                         });
                     }
                     if (_diagChord) {
@@ -9113,6 +9115,7 @@
                             // an arrangement switch mid-linger does not remap the overlay columns.
                             nStr: _diagChord.nStr ?? nStr,
                             lyricsBottom,
+                            scale: Number(bundle.chordDiagramScale) || 1,
                         });
                     }
                     if (sectionHudVisible && bundle.sections && bundle.sections.length) {
