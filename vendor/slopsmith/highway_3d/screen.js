@@ -493,7 +493,10 @@
 
     const FRET_COOLDOWN = 0.5; // seconds a lane fret stays active after last note
 
-    const DIAG_LINGER_S    = 0.55;
+    const DIAG_LINGER_S    = 10;
+    const DIAG_FADEOUT_S   = 0.3;
+    // Fully opaque until the last DIAG_FADEOUT_S of the linger window; dt = chord.t - now (<= 0).
+    const diagLingerOpacity = (dt) => Math.max(0, Math.min(1, (DIAG_LINGER_S + dt) / DIAG_FADEOUT_S));
     const DIAG_ENTRANCE_S  = 0.20;
     const DIAG_CROSSFADE_S = 0.15;
     const DIAG_SIZE_MIN    = 0.08;
@@ -1902,6 +1905,9 @@
         let _diagPrevStartOpacity = 0;
         let _diagPrevStartT       = null;  // bundle.currentTime when crossfade began (drives rewindable fade)
         let _diagEntranceT        = 1.0;
+        // Wall-clock stamps of the last chord change, so the entrance and crossfade still finish while paused.
+        let _diagKeyWall          = 0;
+        let _diagPrevStartWall    = 0;
         let _diagLastKey          = null;  // chord identity: name + '|' + frets.join(',')
         // Per-wave cache for fret-column reference markers. Keyed by the
         // wave's beat timestamp. We snapshot { hasLow, hasHigh, fretList,
@@ -7757,7 +7763,7 @@
                         // stale per-frame chDt; after dropped frames or seeks this prevents
                         // the overlay jumping to a stale brightness before the crossfade.
                         const freshChDt = _diagChord.t !== undefined ? _diagChord.t - now : _diagChord.chDt;
-                        const prevOpacity = Math.max(0, Math.min(1, 1 + freshChDt / DIAG_LINGER_S));
+                        const prevOpacity = diagLingerOpacity(freshChDt);
                         // Only crossfade when the outgoing chord is actually visible at now.
                         // freshChDt > 0 means the old chord is in the future (backward seek
                         // crossed the chord boundary).  In that case _diagChord is stale, so
@@ -7805,8 +7811,7 @@
                                 // Start at the linger opacity the outgoing chord would have had at
                                 // newChord.t during forward playback, not always 1.  This prevents
                                 // a chord that was mostly faded from appearing brighter on a seek.
-                                const histStartOpacity = Math.max(0, Math.min(1,
-                                    1 - (newChord.t - histPrev.t) / DIAG_LINGER_S));
+                                const histStartOpacity = diagLingerOpacity(histPrev.t - newChord.t);
                                 _diagPrev = histPrev;
                                 _diagPrevStartOpacity = histStartOpacity;
                                 _diagPrevOpacity = Math.max(0, histStartOpacity * (1 - elapsed / DIAG_CROSSFADE_S));
@@ -7825,6 +7830,7 @@
                         _diagPrevStartT = null;
                     }
                     _diagLastKey = newKey;
+                    _diagKeyWall = _diagPrevStartWall = performance.now();
                     // Only update _diagChord when the chord key actually changes so that a
                     // lingering chord's original nStr is preserved on subsequent frames.
                     // (newChord is rebuilt every frame with the live nStr; unconditionally
@@ -7859,8 +7865,9 @@
                 // 0.85→1.0 scale animation. On backward seeks t0 is updated alongside t,
                 // so the animation still rewinds correctly to the earlier position.
                 const _entranceAnchor = _diagChord && (_diagChord.t0 ?? _diagChord.t);
+                const _wallSinceKey = (performance.now() - _diagKeyWall) / 1000;
                 _diagEntranceT = (_diagChord && _entranceAnchor !== undefined)
-                    ? Math.min(1.0, Math.max(0, (now - _entranceAnchor) / DIAG_ENTRANCE_S))
+                    ? Math.min(1.0, Math.max(0, Math.max(now - _entranceAnchor, _wallSinceKey) / DIAG_ENTRANCE_S))
                     : 1.0;
 
                 // Crossfade: derived from absolute start time so backward seeks within the
@@ -7869,7 +7876,7 @@
                 // backward seek that re-enters the crossfade window can recompute a positive
                 // opacity. Seeks before _diagPrevStartT are handled by the guard above.
                 if (_diagPrev && _diagPrevStartT !== null) {
-                    const fadedT = Math.max(0, now - _diagPrevStartT);
+                    const fadedT = Math.max(0, now - _diagPrevStartT, (performance.now() - _diagPrevStartWall) / 1000);
                     _diagPrevOpacity = Math.max(0, _diagPrevStartOpacity * (1 - fadedT / DIAG_CROSSFADE_S));
                 }
             }
@@ -9106,7 +9113,7 @@
                     if (_diagChord) {
                         drawChordDiagram(lyricsCtx, {
                             name: _diagChord.name, frets: _diagChord.frets,
-                            opacity: Math.max(0, 1 + (_diagChord.t - bundle.currentTime) / DIAG_LINGER_S),
+                            opacity: diagLingerOpacity(_diagChord.t - bundle.currentTime),
                             entranceT: _diagEntranceT,
                             canvasW: lyricsCanvas.width, canvasH: lyricsCanvas.height,
                             inverted: _invertedCached,
