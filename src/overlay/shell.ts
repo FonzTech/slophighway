@@ -135,7 +135,7 @@ export class HighwayShell {
     this.nextChordsSelect.value = String(s.nextChords);
     this.cameraDistanceSelect.value = s.cameraDistance;
     this.chordOverrideSelect.value = s.chordOverride ? "yes" : "no";
-    this.stdBtn.textContent = this.standard ? "E Std: on" : "E Std: off";
+    this.stdBtn.textContent = this.standard ? "E Std: On" : "E Std: Off";
     this.stdBtn.classList.toggle("shh-on", this.standard);
     this.root.classList.toggle("shh-touch-controls", s.touchControls);
     this.root.classList.toggle("shh-options-hidden", !s.optionsShown);

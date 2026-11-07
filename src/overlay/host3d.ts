@@ -36,9 +36,9 @@ const QUALITY: Record<Quality, QualitySpec> = {
 };
 
 export const QUALITY_LABELS: Record<Quality, string> = {
-  high: "Quality: high",
-  balanced: "Quality: balanced",
-  performance: "Quality: performance",
+  high: "Quality: High",
+  balanced: "Quality: Balanced",
+  performance: "Quality: Performance",
 };
 
 export function qualityOptions(): string {

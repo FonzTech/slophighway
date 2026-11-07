@@ -21,8 +21,8 @@ export function panelHtml(mode: ShellMode): string {
               ${
                 attached
                   ? `<select class="shh-select shh-dock" aria-label="Position">
-                  <option value="top">Dock top</option>
-                  <option value="bottom">Dock bottom</option>
+                  <option value="top">Dock Top</option>
+                  <option value="bottom">Dock Bottom</option>
                   <option value="float">Floating</option>
                 </select>
                 <button type="button" class="shh-btn shh-detach" title="Open the highway in its own window (second monitor, full screen)">Detach</button>
@@ -50,8 +50,8 @@ export function panelHtml(mode: ShellMode): string {
             <div class="shh-group-title">Controls and Appearance</div>
             <div class="shh-group-items">
               <select class="shh-select shh-touch" aria-label="Touch controls" title="Enable on-screen touch controls">
-                <option value="yes">Touch controls: yes</option>
-                <option value="no">Touch controls: no</option>
+                <option value="yes">Touch controls: Yes</option>
+                <option value="no">Touch controls: No</option>
               </select>
               <select class="shh-select shh-camera-distance" aria-label="Camera distance" title="How far the 3D camera sits from the fretboard">
                 ${cameraDistanceOptions()}
@@ -69,8 +69,8 @@ export function panelHtml(mode: ShellMode): string {
                 ${nextChordsOptions()}
               </select>
               <select class="shh-select shh-chord-override" aria-label="Chord override" title="Act on the chord shape box">
-                <option value="no">Chord override: no</option>
-                <option value="yes">Chord override: yes</option>
+                <option value="no">Chord override: No</option>
+                <option value="yes">Chord override: Yes</option>
               </select>
             </div>
           </div>
