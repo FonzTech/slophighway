@@ -22,6 +22,7 @@ export function panelHtml(mode: ShellMode): string {
             ${attached ? `<span class="shh-sync"></span>` : ""}
             <span class="shh-status"></span>
             <div class="shh-options-toggle-parent">
+                ${attached ? `<button type="button" class="shh-btn shh-panic" title="Hide the toolbar and the highway in one click">Panic Hide</button>` : ""}
                 <button type="button" class="shh-btn shh-options-toggle" title="Show or hide the toolbar options"></button>
             </div>
           </div>

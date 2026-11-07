@@ -51,14 +51,27 @@ function defaultPrefs(): LayoutPrefs {
   };
 }
 
+/** The shared storage object also holds settings (`settings.ts`); only touch the keys this type owns. */
+const LAYOUT_KEYS = ["dock", "height", "float", "maximized", "collapsed", "transparent", "standard"] as const;
+
+function pickLayout(value: object): Partial<LayoutPrefs> {
+  const out: Partial<LayoutPrefs> = {};
+  const src = value as Record<string, unknown>;
+  for (const k of LAYOUT_KEYS) {
+    if (src[k] !== undefined) (out as Record<string, unknown>)[k] = src[k];
+  }
+  return out;
+}
+
 async function loadPrefs(): Promise<LayoutPrefs> {
   const base = defaultPrefs();
-  const stored = await loadStored<LayoutPrefs>();
-  return { ...base, ...stored, float: { ...base.float, ...stored?.float } };
+  const stored = await loadStored<Partial<LayoutPrefs>>();
+  const picked = pickLayout(stored ?? {});
+  return { ...base, ...picked, float: { ...base.float, ...picked.float } };
 }
 
 function savePrefs(prefs: LayoutPrefs): void {
-  void patchStored(prefs);
+  void patchStored(pickLayout(prefs));
 }
 
 /** Cache of E-standard conversions so toggling or re-sending doesn't rebuild the chart. */
@@ -121,6 +134,8 @@ export function mountOverlay(): OverlayController {
   const bgBtn = root.querySelector(".shh-bg") as HTMLButtonElement;
   const maxBtn = root.querySelector(".shh-max") as HTMLButtonElement;
   const collapseBtn = root.querySelector(".shh-collapse") as HTMLButtonElement;
+  const panicBtn = root.querySelector(".shh-panic") as HTMLButtonElement;
+  const optionsToggle = root.querySelector(".shh-options-toggle") as HTMLButtonElement;
   const sync = root.querySelector(".shh-sync") as HTMLSpanElement;
 
   const sendDetached = (msg: ToDetached, only?: chrome.runtime.Port) => {
@@ -270,6 +285,11 @@ export function mountOverlay(): OverlayController {
 
   maxBtn.addEventListener("click", () => update({ maximized: !prefs.maximized, collapsed: false }));
   collapseBtn.addEventListener("click", () => update({ collapsed: !prefs.collapsed }));
+  panicBtn?.addEventListener("click", () => {
+    // hide the highway (unless already hidden) and the toolbar options in one click
+    if (!prefs.collapsed) collapseBtn.click();
+    if (shell.settings.optionsShown) optionsToggle.click();
+  });
 
   /** Pointer drag helper: `onMove` gets the offset from the press point. */
   const dragWith = (el: HTMLElement, down: PointerEvent, onMove: (dx: number, dy: number) => void) => {

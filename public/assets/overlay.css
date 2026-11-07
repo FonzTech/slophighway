@@ -168,7 +168,11 @@
 }
 
 #shh-root .shh-options-toggle {
-  margin-left: auto;
+  margin-left: 8px;
+}
+
+#shh-root .shh-btn.shh-panic {
+  border-color: rgba(255, 122, 89, 0.5);
 }
 
 #shh-root .shh-options {
