@@ -2972,6 +2972,7 @@
                 showStringOpenNotes = false,
                 stringNoteLetters = [],
                 rotation = 0,
+                mirrored = false,
             } = opts;
 
             // Responsive sizing — CELL derived from panel height + user slider.
@@ -3154,7 +3155,10 @@
                     const label = seenUp.has(base) ? base.toLowerCase() : base;
                     seenUp.add(base);
                     ctx.fillStyle = (strIdx === 0 || strIdx === 1) ? '#e8d080' : 'rgba(255,255,255,0.55)';
-                    ctx.fillText(label, gx + col * CELL, letterY);
+                    // Mirroring flips the label left-right, so each letter moves to the
+                    // opposite column while keeping its own glyph/case (EADGBe -> eBGDAE).
+                    const drawX = mirrored ? (gx + (COLS - 1 - col) * CELL) : (gx + col * CELL);
+                    ctx.fillText(label, drawX, letterY);
                 }
                 ctx.restore();
             } else if (showStringOpenNotes && (rotation % 180) !== 0) {
@@ -3189,7 +3193,9 @@
                     const base = letter.toUpperCase();
                     const label = lowStrIdx.get(base) === strIdx ? base : base.toLowerCase();
                     // Rotated (vertical) position of this string's column about the grid center.
-                    const dx = gx + col * CELL - cxS;
+                    // Mirroring flips the horizontal offset sign so the letters track the
+                    // mirrored strings (the stack reads in the opposite vertical direction).
+                    const dx = (gx + col * CELL - cxS) * (mirrored ? -1 : 1);
                     const y = ((rotation % 360) === 90 ? cyS - dx : cyS + dx) + shiftY;
                     ctx.fillStyle = (strIdx === 0 || strIdx === 1) ? '#e8d080' : 'rgba(255,255,255,0.55)';
                     ctx.fillText(label, xLeft, y);
@@ -3210,12 +3216,15 @@
                 if (rotation === 270) {
                     // 270°: left-aligned, 32px from the box's left edge.
                     ctx.textAlign = 'left';
-                    ctx.fillText(String(startFret), bx + 32, by + 44);
+                    ctx.fillText(String(startFret), bx + 64, by + 48);
                 } else if ((rotation % 180) !== 0) {
                     // 90°: right-aligned, upper-right corner.
-                    ctx.fillText(String(startFret), bx + boxW - 18, by + 44);
+                    ctx.fillText(String(startFret), bx + boxW - 40, by + 44);
                 } else {
                     ctx.translate(0, shiftY);
+                    // At 180° the starting-fret label sits 88px below its usual left-of-grid
+                    // position, in addition to the shiftY nudge.
+                    if (rotation === 180) ctx.translate(0, 88);
                     ctx.fillText(String(startFret), gx - 14, gy + CELL * 0.5);
                 }
                 ctx.restore();
@@ -3231,14 +3240,17 @@
             // upright. The box, border and chord title stay in place regardless of
             // orientation (0/180 just flip; 90/270 form a horizontal shape). A rotation
             // transform about a point leaves all absolute coordinates intact while rotating
-            // them, so the shape code below keeps using gx/gy.
+            // them, so the shape code below keeps using gx/gy. When mirrored, the fingering
+            // is additionally flipped horizontally (left-right) about the grid center, which
+            // reverses the visible string order (EADGBe -> eBGDAE).
             const shapeRot = ((rotation % 360) + 360) % 360 * Math.PI / 180;
-            if (shapeRot !== 0) {
+            if (shapeRot !== 0 || mirrored) {
                 const cxS = gx + gridW / 2, cyS = gy + gridH / 2;
                 ctx.save();
                 ctx.translate(shiftX, shiftY);   // outermost: shifts the rotated shape (post-rotation)
                 ctx.translate(cxS, cyS);
                 ctx.rotate(shapeRot);
+                if (mirrored) ctx.scale(-1, 1);  // horizontal flip in the local (pre-rotation) frame
                 ctx.translate(-cxS, -cyS);
             }
 
@@ -9350,6 +9362,7 @@
                             showStringOpenNotes: !!bundle.showStringOpenNotes,
                             stringNoteLetters: bundle.stringNoteLetters ?? [],
                             rotation: Number(bundle.chordDiagramRotation) || 0,
+                            mirrored: !!bundle.chordDiagramMirrored,
                         });
                     }
                     if (_diagChord) {
@@ -9368,6 +9381,7 @@
                             showStringOpenNotes: !!bundle.showStringOpenNotes,
                             stringNoteLetters: bundle.stringNoteLetters ?? [],
                             rotation: Number(bundle.chordDiagramRotation) || 0,
+                            mirrored: !!bundle.chordDiagramMirrored,
                         });
                     }
                     drawNextChords(lyricsCtx, {

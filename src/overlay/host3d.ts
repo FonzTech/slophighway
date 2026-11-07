@@ -79,21 +79,49 @@ export function parseChordShapeSize(value: unknown): ChordShapeSize {
   return value === "big" || value === "bigger" || value === "biggest" ? value : "normal";
 }
 
-export type ChordOrientation = "normal" | "90" | "180" | "270";
+export type ChordOrientation =
+  | "normal"
+  | "normal-mirrored"
+  | "90"
+  | "90-mirrored"
+  | "180"
+  | "180-mirrored"
+  | "270"
+  | "270-mirrored";
 
 /** Rotation (degrees clockwise) applied to the chord-shape box, per drop-down value. */
 export const CHORD_ORIENTATION_DEG: Record<ChordOrientation, number> = {
   normal: 0,
+  "normal-mirrored": 0,
   "90": 90,
+  "90-mirrored": 90,
   "180": 180,
+  "180-mirrored": 180,
   "270": 270,
+  "270-mirrored": 270,
+};
+
+/** Whether the chord shape is mirrored (flipped horizontally) for this value. */
+export const CHORD_ORIENTATION_MIRRORED: Record<ChordOrientation, boolean> = {
+  normal: false,
+  "normal-mirrored": true,
+  "90": false,
+  "90-mirrored": true,
+  "180": false,
+  "180-mirrored": true,
+  "270": false,
+  "270-mirrored": true,
 };
 
 export const CHORD_ORIENTATION_LABELS: Record<ChordOrientation, string> = {
   normal: "Chord shape orientation: Normal",
+  "normal-mirrored": "Chord shape orientation: Normal (Mirrored)",
   "90": "Chord shape orientation: 90 degrees",
+  "90-mirrored": "Chord shape orientation: 90 degrees (Mirrored)",
   "180": "Chord shape orientation: 180 degrees",
+  "180-mirrored": "Chord shape orientation: 180 degrees (Mirrored)",
   "270": "Chord shape orientation: 270 degrees",
+  "270-mirrored": "Chord shape orientation: 270 degrees (Mirrored)",
 };
 
 export function chordOrientationOptions(): string {
@@ -103,7 +131,15 @@ export function chordOrientationOptions(): string {
 }
 
 export function parseChordOrientation(value: unknown): ChordOrientation {
-  return value === "90" || value === "180" || value === "270" ? value : "normal";
+  return value === "normal-mirrored" ||
+    value === "90" ||
+    value === "90-mirrored" ||
+    value === "180" ||
+    value === "180-mirrored" ||
+    value === "270" ||
+    value === "270-mirrored"
+    ? (value as ChordOrientation)
+    : "normal";
 }
 
 export type CameraDistance = "farthest" | "farther" | "far" | "normal" | "near" | "nearer" | "nearest";
@@ -273,7 +309,10 @@ export class Highway3D implements HighwayView {
 
   setChordOrientation(orientation: ChordOrientation): void {
     this.chordOrientation = orientation;
-    if (this.bundle) this.bundle.chordDiagramRotation = CHORD_ORIENTATION_DEG[orientation];
+    if (this.bundle) {
+      this.bundle.chordDiagramRotation = CHORD_ORIENTATION_DEG[orientation];
+      this.bundle.chordDiagramMirrored = CHORD_ORIENTATION_MIRRORED[orientation];
+    }
   }
 
   /** The renderer multiplies this by min(devicePixelRatio, 2). */
@@ -325,6 +364,7 @@ export class Highway3D implements HighwayView {
       cameraDistanceMul: CAMERA_DISTANCE_FACTOR[this.cameraDistance],
       showStringOpenNotes: this.showStringOpenNotes,
       chordDiagramRotation: CHORD_ORIENTATION_DEG[this.chordOrientation],
+      chordDiagramMirrored: CHORD_ORIENTATION_MIRRORED[this.chordOrientation],
       stringNoteLetters: stringNoteLetters(arr),
       lyricsVisible: false,
       getNoteState: () => null,

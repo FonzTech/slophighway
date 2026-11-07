@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Slophighway",
   "description": "3D guitar/bass note highway that runs on top of Songsterr tabs, synced to its playback.",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "permissions": ["storage"],
   "host_permissions": [
     "*://www.songsterr.com/*",

@@ -8,7 +8,7 @@ import {
 
 export type ShellMode = "attached" | "detached";
 
-const VERSION = "0.6.2";
+const VERSION = "0.6.3";
 
 /** The single toolbar + stage markup used by both the in-page overlay and the detached window. */
 export function panelHtml(mode: ShellMode): string {
