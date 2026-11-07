@@ -495,6 +495,7 @@
 
     const DIAG_LINGER_S    = 10;
     const DIAG_FADEOUT_S   = 0.3;
+    const NEXT_CHORDS_ANIM_S = 0.25;
     // Fully opaque until the last DIAG_FADEOUT_S of the linger window; dt = chord.t - now (<= 0).
     const diagLingerOpacity = (dt) => Math.max(0, Math.min(1, (DIAG_LINGER_S + dt) / DIAG_FADEOUT_S));
     const DIAG_ENTRANCE_S  = 0.20;
@@ -1909,6 +1910,10 @@
         let _diagKeyWall          = 0;
         let _diagPrevStartWall    = 0;
         let _diagNextNames        = [];
+        // Slide animation of the next-chords list when it advances by one chord (wall-clock driven).
+        let _nextAnimPrev         = [];
+        let _nextAnimStart        = 0;
+        let _nextAnimShift        = false;
         let _diagLastKey          = null;  // chord identity: name + '|' + frets.join(',')
         // Per-wave cache for fret-column reference markers. Keyed by the
         // wave's beat timestamp. We snapshot { hasLow, hasHigh, fretList,
@@ -3277,11 +3282,11 @@
         // diagram's layout (without the "Nfr" padding) so it never fades or scales with the box.
         function drawNextChords(ctx, opts) {
             const {
-                names, canvasW = 600, canvasH = 400,
+                names, prevNames = [], progress = 1, canvasW = 600, canvasH = 400,
                 sizeSlider = 0.5, position = 'tl', nStr = 6,
                 lyricsBottom = 0, scale: userScale = 1,
             } = opts;
-            if (!names || !names.length) return;
+            if (!names || (!names.length && progress >= 1)) return;
             const COLS = nStr, ROWS = 4;
             const sizeF = DIAG_SIZE_MIN + (DIAG_SIZE_MAX - DIAG_SIZE_MIN) * sizeSlider;
             const isTopCorner = position === 'tl' || position === 'tr';
@@ -3318,8 +3323,20 @@
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = 'rgba(232,208,128,0.85)';
-            for (let i = 0; i < names.length; i++) {
-                ctx.fillText(names[i], bx + PAD, y0 + lineH * (i + 0.5));
+            // Eased progress: entries slide up one line; the first leaves (fades out), a new last one enters (fades in).
+            const p = 1 - (1 - progress) * (1 - progress);
+            const drawAt = (text, row, alpha) => {
+                ctx.globalAlpha = alpha;
+                ctx.fillText(text, bx + PAD, y0 + lineH * (row + 0.5));
+            };
+            if (progress < 1 && prevNames.length) {
+                drawAt(prevNames[0], -p, 1 - p);
+                for (let i = 0; i < names.length; i++) {
+                    const incoming = i >= prevNames.length - 1;
+                    drawAt(names[i], i + (1 - p), incoming ? p : 1);
+                }
+            } else {
+                for (let i = 0; i < names.length; i++) drawAt(names[i], i, 1);
             }
             ctx.restore();
         }
@@ -7806,6 +7823,16 @@
                             last = lbl;
                         }
                     }
+                    const prevNames = _diagNextNames;
+                    if (names.join('\n') !== prevNames.join('\n')) {
+                        let shifted = prevNames.length > 0;
+                        for (let i = 0; shifted && i < Math.min(names.length, prevNames.length - 1); i++) {
+                            if (names[i] !== prevNames[i + 1]) shifted = false;
+                        }
+                        _nextAnimPrev = prevNames;
+                        _nextAnimShift = shifted;
+                        _nextAnimStart = performance.now();
+                    }
                     _diagNextNames = names;
                 }
                 if (chords) {
@@ -9197,6 +9224,10 @@
                     }
                     drawNextChords(lyricsCtx, {
                         names: _diagNextNames,
+                        prevNames: _nextAnimPrev,
+                        progress: _nextAnimShift
+                            ? Math.min(1, (performance.now() - _nextAnimStart) / NEXT_CHORDS_ANIM_S / 1000)
+                            : 1,
                         canvasW: lyricsCanvas.width, canvasH: lyricsCanvas.height,
                         sizeSlider: chordDiagramSize, position: chordDiagramPosition,
                         nStr, lyricsBottom,
