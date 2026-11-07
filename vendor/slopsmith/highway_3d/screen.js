@@ -172,10 +172,10 @@
     const BEHIND = 0.5;
     // How long a note/chord-frame stays renderable past the hit line while a
     // note-state provider (slopsmith#254) is attached. The provider's
-    // hit/miss verdict is asynchronous — the engine-side verifier reports it
-    // ~0.35-0.5 s after the line — so the default ~50 ms note linger /
-    // ~0.48 s chord linger lapses before the tint can apply. Drives both
-    // the outer-loop cull (ndVerdictT0) and the smart drawNote cull below.
+    // hit/miss verdict is asynchronous - the engine-side verifier reports it
+    // ~0.35-0.5 s after the line. This window lets a gem with a pending verdict
+    // remain renderable past its normal linger. Drives both the outer-loop cull
+    // (ndVerdictT0) and the smart drawNote cull below.
     const NOTEDETECT_GEM_VERDICT_WINDOW = 0.75;
     // chDt threshold past the hit line at which the chord-frame scan
     // gives up on an arpeggio-style frame whose constituents never come
@@ -498,8 +498,8 @@
     const NEXT_CHORDS_ANIM_S = 0.25;
     // Longest a chord name stays at the hit line on the highway while waiting for the next named chord.
     const CHORD_NAME_HOLD_S = 10;
-    // Chord gems vanish this long after their onset (or sustain end); the frame and ghost digits keep CHORD_HWY_LINGER_S.
-    const CHORD_GEM_LINGER_S = 0.05;
+    // Gem hold after onset when not sustained. Set to 0 to remove at the hit line.
+    const NOTE_GEM_LINGER_S = 0.05;
     // How many seconds before the hit the ghost outline gem (and its fret digit) shows on the fretboard for an
     // incoming note. 0 hides it entirely; the original renderer used 0.6.
     const INCOMING_OUTLINE_S = 0;
@@ -6648,7 +6648,7 @@
                         singleOpenX,
                         skipLabel,
                         _isSlideTgt,
-                        GHOST_HOLD_AFTER_ONSET,
+                        NOTE_GEM_LINGER_S,
                         singleOpenLaneW,
                         arGhostCid != null,
                         arGhostCid,
@@ -6905,9 +6905,9 @@
                     // ch.t (not per-note onset) since chord notes
                     // share a strum time.
                     const chW          = chWindowed ? Math.exp(-Math.abs(ch.t - now) / camTau) : 0;
-                    // Next-chord tail: same voicing (``highDensity`` gallop) keeps full linger + optional
-                    // fade suppression inside [hold−fade, hold]; a voicing change clips the tail to the
-                    // chart gap so D5→D#5 (~185 ms) does not stack two cyan frames (Frantic ~2:47).
+                    // A different voicing cuts off this chord's visual tail.
+                    // Same-voicing repeats keep the normal linger so repeated
+                    // strums (including muted/ghost hits) read as one run.
                     let cjNext = null;
                     for (let j = ci + 1; j < chords.length; j++) {
                         const cj = chords[j];
@@ -6916,49 +6916,34 @@
                         cjNext = cj;
                         break;
                     }
-                    let chordTailHoldS = CHORD_HWY_LINGER_S;
+                    const hasNextChord = !!cjNext && cjNext.t > ch.t + 1e-6;
+                    const sameVoicingNext = hasNextChord
+                        && runSig !== null
+                        && chordShapeSignature(cjNext) === runSig;
+                    const nextChordGap = hasNextChord && !sameVoicingNext ? cjNext.t - ch.t : Infinity;
+                    if (hasNextChord && !sameVoicingNext && now >= cjNext.t) continue;
+                    let chordTailHoldS = Math.min(CHORD_HWY_LINGER_S, nextChordGap);
                     let chordNextSoon = false;
-                    if (cjNext && cjNext.t > ch.t + 1e-6) {
-                        const nextSig = chordShapeSignature(cjNext);
-                        const sameVoicingNext = runSig !== null && nextSig !== null && nextSig === runSig;
+                    if (hasNextChord) {
                         if (sameVoicingNext) {
                             const chordFadeWinLo = ch.t + (CHORD_HWY_LINGER_S - CHORD_HWY_FADE_S);
                             const chordFadeWinHi = ch.t + CHORD_HWY_LINGER_S;
                             if (cjNext.t >= chordFadeWinLo - 1e-6 && cjNext.t <= chordFadeWinHi + 1e-6) {
                                 chordNextSoon = true;
                             }
-                        } else {
-                            chordTailHoldS = Math.min(CHORD_HWY_LINGER_S, Math.max(cjNext.t - ch.t, 1e-3));
                         }
                     }
-                    // slopsmith#254 — engine verdicts land ~0.4 s after the
-                    // chord crosses; on a fast different-voicing sequence
-                    // the clip above can shrink the rim's draw life below
-                    // that, so the green/red latch is set but the rim isn't
-                    // drawn anymore. When a verdict provider is attached,
-                    // floor the hold at NOTEDETECT_GEM_VERDICT_WINDOW so
-                    // the tinted rim is actually visible.
-                    //
-                    // This deliberately overrides the "voicing-change clip
-                    // prevents two stacked cyan frames" behavior documented
-                    // above (the D5→D#5 / Frantic ~2:47 case): the post-hit
-                    // z clamp (Math.min(0, dZ(chDt)) below) pins extended
-                    // frames at z=0, so the two frames do overlap in plane
-                    // — they're distinguished by their now-tinted rim
-                    // colors (green/red verdict vs teal default) rather
-                    // than perspective depth. In detect mode that's the
-                    // right trade: verdict visibility beats the cleaner
-                    // approach silhouette. Without detect mode the
-                    // original clip still applies.
+                    // Keep a chord visible for its async verdict when possible,
+                    // but never extend its visual tail past a different voicing.
                     if (_ndHasProvider && chordTailHoldS < NOTEDETECT_GEM_VERDICT_WINDOW) {
-                        chordTailHoldS = NOTEDETECT_GEM_VERDICT_WINDOW;
+                        chordTailHoldS = Math.min(NOTEDETECT_GEM_VERDICT_WINDOW, nextChordGap);
                     }
                     const chordTailFadeS = Math.min(CHORD_HWY_FADE_S, chordTailHoldS);
                     if (!deferChordGems) {
                         for (const cn of chordNotes) {
                             const skipLabel = !firstInShapeRun || lastFretForString[cn.s] === cn.f;
                             drawNote(
-                                { ...cn, t: ch.t, sus: cn.sus || 0 },
+                                { ...cn, t: ch.t, sus: Math.min(cn.sus || 0, nextChordGap) },
                                 now,
                                 cn.f === 0 ? chordCX : undefined,
                                 skipLabel,
@@ -7426,7 +7411,7 @@
                     // MeshBasicMaterial) in the WebGL scene so they respect
                     // renderOrder (16) and never occlude note gems (20/21).
                     if (chShape.size > 1 && chordOpenBoxW != null && !isRepeat && chDt < AHEAD) {
-                        const _effSus    = Math.max(maxSus, 0.4);
+                        const _effSus    = Math.min(Math.max(maxSus, 0.4), nextChordGap);
                         const _dtSusEnd  = chDt + _effSus;
                         if (_dtSusEnd > 0) {
                             const _zNear = chDt > 0 ? dZ(chDt) : 0;
@@ -8276,7 +8261,7 @@
             }
 
             const sustained = dt < 0 && hasSus && now <= susEnd;
-            const gemGone = fromChord && !_ndHasProvider && dt < -CHORD_GEM_LINGER_S && !sustained;
+            const gemGone = fromChord && !_ndHasProvider && dt < -NOTE_GEM_LINGER_S && !sustained;
             const hitDist = Math.abs(dt);
             const hit = hitDist < 0.15 || sustained;
             const hitFade = sustained ? 0.7 : (hitDist < 0.15 ? 1 - hitDist / 0.15 : 0);
