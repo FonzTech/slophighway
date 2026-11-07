@@ -445,12 +445,14 @@ export function mountOverlay(): OverlayController {
     const rect = stage.getBoundingClientRect();
     const nx = e.clientX - rect.left;
     const ny = e.clientY - rect.top;
-    if (nx < w * TOUCH_PLAY_MIN_X) {
-      startRepeat("ArrowLeft");
-    } else if (nx > w * TOUCH_PLAY_MAX_X) {
-      startRepeat("ArrowRight");
-    } else if (ny >= h * TOUCH_PLAY_MIN_Y && ny <= h * TOUCH_PLAY_MAX_Y) {
-      togglePlayback();
+    if (ny >= h * TOUCH_PLAY_MIN_Y && ny <= h * TOUCH_PLAY_MAX_Y) {
+      if (nx < w * TOUCH_PLAY_MIN_X) {
+        startRepeat("ArrowLeft");
+      } else if (nx > w * TOUCH_PLAY_MAX_X) {
+        startRepeat("ArrowRight");
+      } else  {
+        togglePlayback();
+      }
     }
   });
   for (const stop of ["pointerup", "pointerleave", "pointercancel"]) {
