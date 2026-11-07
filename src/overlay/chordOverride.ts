@@ -8,71 +8,81 @@ import type { RsArrangement, RsChordTemplate } from "../songsterr/rocksmith";
  *
  * Shapes are high-e-first (index 0 = high E, index 5 = low E), matching the
  * renderer's chord-template convention: -1 = unused/muted, 0 = open, n>0 = fret.
+ * Each chord maps to a set of valid shapes (e.g. an open A and a 5th-fret A
+ * shape); the voicing actually used is chosen from that set at override time.
  * Slash chords (e.g. "D/F#") are normalized to their root before lookup.
  */
 
-/** Maps a normalized chord name (root + accidental + quality) to a 6-string shape. */
-const FINGERINGS: Record<string, number[]> = {
+/** All valid fingerings for one chord, as a hashset of shapes. */
+type ChordShapes = Set<number[]>;
+
+/** Build a ChordShapes set from a literal list of shapes. */
+function shapes(list: number[][]): ChordShapes {
+  return new Set(list);
+}
+
+/** Maps a normalized chord name (root + accidental + quality) to its shape(s). */
+const FINGERINGS: Record<string, ChordShapes> = {
   // A chords
-  a: [-1, 0, 2, 2, 2, -1],
-  am: [-1, 0, 2, 2, 1, -1],
-  asus2: [-1, 0, 2, 2, 0, -1],
-  asus4: [-1, 0, 2, 2, 3, -1],
-  a7: [-1, 0, 2, 0, 2, -1],
-  am7: [-1, 0, 2, 0, 1, -1],
-  amaj7: [-1, 0, 2, 1, 2, -1],
+  a: shapes([[-1, 0, 2, 2, 2, -1]]),
+  am: shapes([[-1, 0, 2, 2, 1, -1]]),
+  asus2: shapes([[-1, 0, 2, 2, 0, -1]]),
+  asus4: shapes([[-1, 0, 2, 2, 3, -1]]),
+  a7: shapes([[-1, 0, 2, 0, 2, -1]]),
+  am7: shapes([[-1, 0, 2, 0, 1, -1]]),
+  amaj7: shapes([[-1, 0, 2, 1, 2, -1]]),
 
   // B chords
-  b: [-1, 2, 4, 4, 4, -1],
-  bm: [-1, 2, 4, 4, 3, -1],
-  bsus4: [-1, 2, 4, 4, 5, 2],
-  b7: [-1, 2, 1, 2, 0, 2],
-  bm7: [-1, 2, 0, 2, 3, -1],
+  b: shapes([[-1, 2, 4, 4, 4, -1]]),
+  bm: shapes([[-1, 2, 4, 4, 3, -1]]),
+  bsus4: shapes([[-1, 2, 4, 4, 5, 2]]),
+  b7: shapes([[-1, 2, 1, 2, 0, 2]]),
+  bm7: shapes([[-1, 2, 0, 2, 3, -1]]),
 
   // C chords
-  c: [-1, 3, 2, 0, 1, -1],
-  cm: [-1, 3, 5, 5, 4, -1],
-  csus2: [-1, 3, 0, 0, 1, -1],
-  csus4: [-1, 3, 3, 0, 1, -1],
-  c7: [-1, 3, 2, 3, 1, -1],
-  cmaj7: [-1, 3, 2, 0, 0, -1],
+  c: shapes([[-1, 3, 2, 0, 1, -1]]),
+  cm: shapes([[-1, 3, 5, 5, 4, -1]]),
+  csus2: shapes([[-1, 3, 0, 0, 1, -1], [-1, 3, 0, 0, 3, -1]]),
+  csus4: shapes([[-1, 3, 3, 0, 1, -1]]),
+  c7: shapes([[-1, 3, 2, 3, 1, -1]]),
+  cmaj7: shapes([[-1, 3, 2, 0, 0, -1]]),
 
   // Db chords
-  db: [-1, 4, 3, 1, 2, 1],
+  db: shapes([[-1, 4, 3, 1, 2, 1]]),
 
   // D chords
-  d: [-1, -1, 0, 2, 3, 2],
-  dm: [-1, -1, 0, 2, 3, 1],
-  dsus2: [-1, -1, 0, 2, 3, 0],
-  dsus4: [-1, -1, 0, 2, 3, 3],
-  d7: [-1, -1, 0, 2, 1, 2],
-  dmaj7: [-1, -1, 0, 2, 2, 2],
+  d: shapes([[-1, -1, 0, 2, 3, 2]]),
+  dm: shapes([[-1, -1, 0, 2, 3, 1]]),
+  dsus2: shapes([[-1, -1, 0, 2, 3, 0]]),
+  dsus4: shapes([[-1, -1, 0, 2, 3, 3]]),
+  d7: shapes([[-1, -1, 0, 2, 1, 2]]),
+  dmaj7: shapes([[-1, -1, 0, 2, 2, 2]]),
 
   // Eb chords
-  eb: [-1, 6, 5, 3, 4, 3],
+  eb: shapes([[-1, 6, 5, 3, 4, 3]]),
 
   // E chords
-  e: [0, 2, 2, 1, 0, 0],
-  em: [0, 2, 2, 0, 0, 0],
-  esus4: [0, 2, 2, 2, 0, 0],
-  e7: [0, 2, 0, 1, 0, 0],
-  em7: [0, 2, 0, 0, 0, 0],
-  emaj7: [0, 2, 1, 1, 0, 0],
+  e: shapes([[0, 2, 2, 1, 0, 0]]),
+  em: shapes([[0, 2, 2, 0, 0, 0]]),
+  esus4: shapes([[0, 2, 2, 2, 0, 0]]),
+  e7: shapes([[0, 2, 0, 1, 0, 0]]),
+  em7: shapes([[0, 2, 0, 0, 0, 0]]),
+  emaj7: shapes([[0, 2, 1, 1, 0, 0]]),
 
   // F chords
-  f: [-1, -1, 3, 2, 1, 1],
-  fm: [-1, -1, 3, 1, 1, 1],
-  fsus4: [-1, -1, 3, 3, 1, 1],
-  f7: [-1, -1, 1, 2, 1, 1],
-  fmaj7: [-1, -1, 3, 2, 1, 0],
+  f: shapes([[-1, -1, 3, 2, 1, 1]]),
+  fm: shapes([[-1, -1, 3, 1, 1, 1]]),
+  fsus4: shapes([[-1, -1, 3, 3, 1, 1]]),
+  f7: shapes([[-1, -1, 1, 2, 1, 1]]),
+  fmaj7: shapes([[-1, -1, 3, 2, 1, 0]]),
 
   // G chords
-  g: [3, 2, 0, 0, 0, 3],
-  "g/b": [-1, 2, 0, 0, 0, 3],
-  gm: [3, 5, 5, 3, 3, 3],
-  gsus4: [3, 3, 0, 0, 1, 3],
-  g7: [3, 2, 0, 0, 0, 1],
-  gmaj7: [3, 2, 0, 0, 0, 2],
+  g: shapes([[3, 2, 0, 0, 0, 3]]),
+  "g/b": shapes([[-1, 2, 0, 0, 0, 3]]),
+  gm: shapes([[3, 5, 5, 3, 3, 3]]),
+  gsus4: shapes([[3, 3, 0, 0, 1, 3]]),
+  g7: shapes([[3, 2, 0, 0, 0, 1]]),
+  gmaj7: shapes([[3, 2, 0, 0, 0, 2]]),
 };
 
 /**
@@ -92,6 +102,31 @@ function chordRoot(name: string): string {
   return name.split("/")[0] ?? "";
 }
 
+/**
+ * Picks the shape whose position (lowest fret) best matches where the chord is
+ * being played. `hintFret` is the fret of the single surviving note in a broken
+ * template (or -1 when the chart gave no note at all); we choose the shape with
+ * the closest position so different voicings of the same chord are recognized.
+ * With no usable hint the lowest (open) shape wins.
+ */
+function pickShape(shapes: ChordShapes, hintFret: number): number[] | undefined {
+  if (shapes.size === 0) return undefined;
+
+  let best: number[] | undefined;
+  let bestPos = Infinity;
+  let bestDist = Infinity;
+  for (const shape of shapes) {
+    const pos = lowestPlayedFret(shape);
+    const dist = hintFret < 0 || !Number.isFinite(hintFret) ? pos : Math.abs(pos - hintFret);
+    if (dist < bestDist || (dist === bestDist && pos < bestPos)) {
+      best = shape;
+      bestPos = pos;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
 /** High-E-first shapes must match the arrangement's string count; pads/truncates to `strings`. */
 function fitShape(shape: number[], strings: number): number[] {
   if (strings === 6) return shape;
@@ -105,11 +140,21 @@ function playedCount(frets: number[]): number {
   return frets.reduce((acc, f) => acc + (f >= 0 ? 1 : 0), 0);
 }
 
+/** The lowest fret actually played in a shape (>= 0), or -1 if every string is unused/muted. */
+function lowestPlayedFret(frets: number[]): number {
+  return frets.reduce((acc, f) => {
+    if (f < 0) return acc;
+    return acc < 0 || f < acc ? f : acc;
+  }, -1);
+}
+
 /**
  * Returns a corrected chordTemplates array for the arrangement when `enabled`.
  * Any template whose name matches the table AND carries at most one played
- * note is replaced with the table's shape (fitted to the arrangement's string
- * count). Non-matching or healthy templates are returned unchanged.
+ * note is replaced with a matching shape (fitted to the arrangement's string
+ * count). The surviving note's fret selects which voicing of the chord to use,
+ * so multiple shapes of the same chord are recognized. Non-matching or healthy
+ * templates are returned unchanged.
  */
 export function applyChordOverride(
   arrangement: RsArrangement,
@@ -121,9 +166,11 @@ export function applyChordOverride(
     const name = tmpl.name ?? tmpl.displayName ?? "";
     const key = normalizeChordName(name);
     // Prefer an exact slash-inversion entry (e.g. "g/b"), fall back to the root chord.
-    const shape = FINGERINGS[key] ?? FINGERINGS[chordRoot(key)];
-    if (!shape) return tmpl;
+    const chordShapes = FINGERINGS[key] ?? FINGERINGS[chordRoot(key)];
+    if (!chordShapes) return tmpl;
     if (playedCount(tmpl.frets) > 1) return tmpl;
+    const shape = pickShape(chordShapes, lowestPlayedFret(tmpl.frets));
+    if (!shape) return tmpl;
     return { ...tmpl, frets: fitShape(shape, arrangement.strings) };
   });
 }
