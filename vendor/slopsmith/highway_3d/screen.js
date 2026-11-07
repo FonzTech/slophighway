@@ -6871,9 +6871,16 @@
                     // cover the arpeggio shape; otherwise explicit/synth hand
                     // shapes can produce an empty lavender frame with no notes
                     // inside (e.g. template-marked `-arp` chord rows).
-                    const deferChordGems = (ch.h3dSynth && noteStreamCoversArpShape())
+                    // A broken authored chord may contain only one real note
+                    // while chord override supplies the full fingering. Later
+                    // standalone notes can then look like an arpeggio across
+                    // that shape; never let that inference hide the chord row's
+                    // only gem.
+                    const deferChordGems = chordNotes.length > 1 && (
+                        (ch.h3dSynth && noteStreamCoversArpShape())
                         || inferredArpPattern
-                        || (hsHintFrame.explicit && hsHintFrame.covered && noteStreamCoversArpShape());
+                        || (hsHintFrame.explicit && hsHintFrame.covered && noteStreamCoversArpShape())
+                    );
                     /**
                      * Lavender chord frame + purple highway rails: authored
                      * arpeggio metadata only. RS ``highDensity`` marks gallops /
