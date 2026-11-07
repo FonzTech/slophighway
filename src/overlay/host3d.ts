@@ -78,6 +78,39 @@ export function parseChordShapeSize(value: unknown): ChordShapeSize {
   return value === "big" || value === "bigger" || value === "biggest" ? value : "normal";
 }
 
+export type CameraDistance = "farthest" | "farther" | "far" | "normal" | "near" | "nearer" | "nearest";
+
+/** Multiplier on the renderer's camera distance for each option; 1 is the renderer's own distance. */
+export const CAMERA_DISTANCE_FACTOR: Record<CameraDistance, number> = {
+  farthest: 1.6,
+  farther: 1.4,
+  far: 1.2,
+  normal: 1,
+  near: 0.85,
+  nearer: 0.7,
+  nearest: 0.55,
+};
+
+export const CAMERA_DISTANCE_LABELS: Record<CameraDistance, string> = {
+  farthest: "Camera Distance: Farthest",
+  farther: "Camera Distance: Farther",
+  far: "Camera Distance: Far",
+  normal: "Camera Distance: Normal",
+  near: "Camera Distance: Near",
+  nearer: "Camera Distance: Nearer",
+  nearest: "Camera Distance: Nearest",
+};
+
+export function cameraDistanceOptions(): string {
+  return (Object.keys(CAMERA_DISTANCE_LABELS) as CameraDistance[])
+    .map((c) => `<option value="${c}">${CAMERA_DISTANCE_LABELS[c]}</option>`)
+    .join("");
+}
+
+export function parseCameraDistance(value: unknown): CameraDistance {
+  return typeof value === "string" && value in CAMERA_DISTANCE_FACTOR ? (value as CameraDistance) : "normal";
+}
+
 export const MAX_NEXT_CHORDS = 5;
 
 export function nextChordsOptions(): string {
@@ -114,6 +147,7 @@ export class Highway3D implements HighwayView {
   private quality: QualitySpec;
   private chordShape: ChordShapeSize;
   private nextChords: number;
+  private cameraDistance: CameraDistance;
   private lastFrame = 0;
   private frameBudget = 0;
 
@@ -125,6 +159,7 @@ export class Highway3D implements HighwayView {
     quality: Quality = "balanced",
     chordShape: ChordShapeSize = "normal",
     nextChords = 0,
+    cameraDistance: CameraDistance = "normal",
   ) {
     this.stage = stage;
     this.clock = clock;
@@ -133,6 +168,7 @@ export class Highway3D implements HighwayView {
     this.quality = QUALITY[quality];
     this.chordShape = chordShape;
     this.nextChords = nextChords;
+    this.cameraDistance = cameraDistance;
     this.canvas = document.createElement("canvas");
     this.canvas.className = "shh-canvas shh-canvas-3d";
     stage.appendChild(this.canvas);
@@ -170,6 +206,11 @@ export class Highway3D implements HighwayView {
   setChordShapeSize(size: ChordShapeSize): void {
     this.chordShape = size;
     if (this.bundle) this.bundle.chordDiagramScale = CHORD_SHAPE_SCALE[size];
+  }
+
+  setCameraDistance(distance: CameraDistance): void {
+    this.cameraDistance = distance;
+    if (this.bundle) this.bundle.cameraDistanceMul = CAMERA_DISTANCE_FACTOR[distance];
   }
 
   setNextChordCount(count: number): void {
@@ -223,6 +264,7 @@ export class Highway3D implements HighwayView {
       renderScale: this.renderScale(),
       chordDiagramScale: CHORD_SHAPE_SCALE[this.chordShape],
       nextChordCount: this.nextChords,
+      cameraDistanceMul: CAMERA_DISTANCE_FACTOR[this.cameraDistance],
       lyricsVisible: false,
       getNoteState: () => null,
     };

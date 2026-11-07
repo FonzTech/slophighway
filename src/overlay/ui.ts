@@ -6,7 +6,10 @@ import { Highway2D } from "./highway";
 import {
   Highway3D,
   chordShapeOptions,
+  cameraDistanceOptions,
   nextChordsOptions,
+  parseCameraDistance,
+  type CameraDistance,
   parseNextChords,
   hasTouchSupport,
   parseChordShapeSize,
@@ -47,6 +50,7 @@ type Prefs = {
   /** Size of the chord shape diagram at the top left of the highway. */
   chordShape: ChordShapeSize;
   nextChords: number;
+  cameraDistance: CameraDistance;
 };
 
 const PREFS_KEY = "shh-prefs";
@@ -86,6 +90,7 @@ function defaultPrefs(): Prefs {
     touchControls: hasTouchSupport(),
     chordShape: "normal",
     nextChords: 0,
+    cameraDistance: "normal",
   };
 }
 
@@ -100,6 +105,7 @@ async function loadPrefs(): Promise<Prefs> {
       quality: parseQuality(stored?.quality),
       chordShape: parseChordShapeSize(stored?.chordShape),
       nextChords: parseNextChords(stored?.nextChords),
+      cameraDistance: parseCameraDistance(stored?.cameraDistance),
     };
   } catch {
     return base;
@@ -153,6 +159,9 @@ export function mountOverlay(): OverlayController {
         <select class="shh-select shh-next-chords" aria-label="Number of next chords" title="How many upcoming chords to list under the chord shape diagram">
           ${nextChordsOptions()}
         </select>
+        <select class="shh-select shh-camera-distance" aria-label="Camera distance" title="How far the 3D camera sits from the fretboard">
+          ${cameraDistanceOptions()}
+        </select>
         <button type="button" class="shh-btn shh-std" title="Re-fret every track for E standard tuning"></button>
         <select class="shh-select shh-dock" aria-label="Position">
           <option value="top">Dock top</option>
@@ -183,6 +192,7 @@ export function mountOverlay(): OverlayController {
   const touchSelect = root.querySelector(".shh-touch") as HTMLSelectElement;
   const chordShapeSelect = root.querySelector(".shh-chord-shape") as HTMLSelectElement;
   const nextChordsSelect = root.querySelector(".shh-next-chords") as HTMLSelectElement;
+  const cameraDistanceSelect = root.querySelector(".shh-camera-distance") as HTMLSelectElement;
   const stdBtn = root.querySelector(".shh-std") as HTMLButtonElement;
   const detachBtn = root.querySelector(".shh-detach") as HTMLButtonElement;
   const bgBtn = root.querySelector(".shh-bg") as HTMLButtonElement;
@@ -293,6 +303,7 @@ export function mountOverlay(): OverlayController {
     touchSelect.value = prefs.touchControls ? "yes" : "no";
     chordShapeSelect.value = prefs.chordShape;
     nextChordsSelect.value = String(prefs.nextChords);
+    cameraDistanceSelect.value = prefs.cameraDistance;
     stdBtn.textContent = prefs.standard ? "E Std: on" : "E Std: off";
     stdBtn.classList.toggle("shh-on", prefs.standard);
     detachBtn.textContent = detached() ? "Attach" : "Detach";
@@ -310,7 +321,7 @@ export function mountOverlay(): OverlayController {
     try {
       view =
         prefs.view === "3d" && webgl2Available()
-          ? new Highway3D(stage, clock, (text) => (status.textContent = text), prefs.transparent, prefs.quality, prefs.chordShape, prefs.nextChords)
+          ? new Highway3D(stage, clock, (text) => (status.textContent = text), prefs.transparent, prefs.quality, prefs.chordShape, prefs.nextChords, prefs.cameraDistance)
           : new Highway2D(stage, clock, prefs.transparent);
     } catch (err) {
       console.error("[slophighway] view init failed", err);
@@ -368,6 +379,11 @@ export function mountOverlay(): OverlayController {
   nextChordsSelect.addEventListener("change", () => {
     update({ nextChords: parseNextChords(nextChordsSelect.value) });
     if (view instanceof Highway3D) view.setNextChordCount(prefs.nextChords);
+  });
+
+  cameraDistanceSelect.addEventListener("change", () => {
+    update({ cameraDistance: parseCameraDistance(cameraDistanceSelect.value) });
+    if (view instanceof Highway3D) view.setCameraDistance(prefs.cameraDistance);
   });
 
   const pickTrack = (partId: number) => {
@@ -529,6 +545,7 @@ export function mountOverlay(): OverlayController {
     const requality = loaded.quality !== prefs.quality;
     const reshape = loaded.chordShape !== prefs.chordShape;
     const renext = loaded.nextChords !== prefs.nextChords;
+    const recamera = loaded.cameraDistance !== prefs.cameraDistance;
     prefs = loaded;
     applyLayout();
     if (rebuild) createView();
@@ -536,6 +553,7 @@ export function mountOverlay(): OverlayController {
       if (requality) view.setQuality(prefs.quality);
       if (reshape) view.setChordShapeSize(prefs.chordShape);
       if (renext) view.setNextChordCount(prefs.nextChords);
+      if (recamera) view.setCameraDistance(prefs.cameraDistance);
     }
     if (restandard) publishCurrent(false);
   });

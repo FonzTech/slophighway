@@ -8807,7 +8807,7 @@
             const lerp = CAM_LERP_BASE * Math.max(bpm, 60) / 120;
             curX += (tgtX - curX) * lerp;
             curDist += (tgtDist - curDist) * lerp;
-            const dist = curDist * aspectScale;
+            const dist = curDist * aspectScale * (Number(bundle.cameraDistanceMul) || 1);
             const h = CAM_H_BASE * (dist / CAM_DIST_BASE);
             const shoulderOffset = (_leftyCached ? -1 : 1) * 20 * K;
             cam.position.set(curX + shoulderOffset, h * 0.95, dist * 0.75);
