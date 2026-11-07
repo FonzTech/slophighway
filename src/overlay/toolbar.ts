@@ -68,6 +68,10 @@ export function panelHtml(mode: ShellMode): string {
               <select class="shh-select shh-next-chords" aria-label="Number of next chords" title="How many upcoming chords to list under the chord shape diagram">
                 ${nextChordsOptions()}
               </select>
+              <select class="shh-select shh-chord-override" aria-label="Chord override" title="Act on the chord shape box">
+                <option value="no">Chord override: no</option>
+                <option value="yes">Chord override: yes</option>
+              </select>
             </div>
           </div>
         </div>

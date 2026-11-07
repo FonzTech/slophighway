@@ -23,6 +23,8 @@ export type SharedSettings = {
   cameraDistance: CameraDistance;
   /** Whether the toolbar's advanced options group is expanded. */
   optionsShown: boolean;
+  /** Whether the "Chord override" feature for the chord shape box is enabled. */
+  chordOverride: boolean;
 };
 
 /** Storage key holding the shared settings plus the attached overlay's layout preferences. */
@@ -37,6 +39,7 @@ export function defaultSettings(): SharedSettings {
     nextChords: 0,
     cameraDistance: "normal",
     optionsShown: true,
+    chordOverride: false,
   };
 }
 
@@ -51,6 +54,7 @@ export function parseSettings(stored: Partial<Record<keyof SharedSettings, unkno
     nextChords: parseNextChords(stored?.nextChords),
     cameraDistance: parseCameraDistance(stored?.cameraDistance),
     optionsShown: typeof stored?.optionsShown === "boolean" ? stored.optionsShown : base.optionsShown,
+    chordOverride: typeof stored?.chordOverride === "boolean" ? stored.chordOverride : base.chordOverride,
   };
 }
 

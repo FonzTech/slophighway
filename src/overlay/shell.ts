@@ -67,6 +67,7 @@ export class HighwayShell {
   private readonly chordShapeSelect: HTMLSelectElement;
   private readonly nextChordsSelect: HTMLSelectElement;
   private readonly cameraDistanceSelect: HTMLSelectElement;
+  private readonly chordOverrideSelect: HTMLSelectElement;
   private readonly stdBtn: HTMLButtonElement;
   private readonly resizeObserver: ResizeObserver;
   private readonly unwatch: () => void;
@@ -98,6 +99,7 @@ export class HighwayShell {
     this.chordShapeSelect = q(".shh-chord-shape");
     this.nextChordsSelect = q(".shh-next-chords");
     this.cameraDistanceSelect = q(".shh-camera-distance");
+    this.chordOverrideSelect = q(".shh-chord-override");
     this.stdBtn = q(".shh-std");
     this.optionsToggle = q(".shh-options-toggle");
     this.optionsToggle.addEventListener("click", () => {
@@ -132,6 +134,7 @@ export class HighwayShell {
     this.chordShapeSelect.value = s.chordShape;
     this.nextChordsSelect.value = String(s.nextChords);
     this.cameraDistanceSelect.value = s.cameraDistance;
+    this.chordOverrideSelect.value = s.chordOverride ? "yes" : "no";
     this.stdBtn.textContent = this.standard ? "E Std: on" : "E Std: off";
     this.stdBtn.classList.toggle("shh-on", this.standard);
     this.root.classList.toggle("shh-touch-controls", s.touchControls);
@@ -264,6 +267,7 @@ export class HighwayShell {
     on(this.chordShapeSelect, () => set({ chordShape: parseChordShapeSize(this.chordShapeSelect.value) }));
     on(this.nextChordsSelect, () => set({ nextChords: parseNextChords(this.nextChordsSelect.value) }));
     on(this.cameraDistanceSelect, () => set({ cameraDistance: parseCameraDistance(this.cameraDistanceSelect.value) }));
+    on(this.chordOverrideSelect, () => set({ chordOverride: this.chordOverrideSelect.value === "yes" }));
     this.stdBtn.addEventListener("click", () => this.source.setStandard(!this.standard));
   }
 
