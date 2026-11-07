@@ -97,15 +97,13 @@ export function mountControlsLegend(stage: HTMLElement, extra: [key: string, act
 export function mountTouchNav(stage: HTMLElement): HTMLElement {
   const el = document.createElement("div");
   el.className = "shh-touch-nav";
-  for (const [arrow, side] of [
-    ["\u2190", "left"],
-    ["\u2192", "right"],
-  ] as const) {
+  for (const side of ["left", "right"] as const) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `shh-touch-nav-btn shh-arrow-${side}`;
     btn.setAttribute("aria-label", side === "left" ? "Left" : "Right");
-    btn.textContent = arrow;
+    // content-script CSS url()s resolve against the page, so point at the extension file directly
+    btn.style.backgroundImage = `url("${chrome.runtime.getURL(`img/chevron_${side}.png`)}")`;
     el.appendChild(btn);
   }
   stage.appendChild(el);

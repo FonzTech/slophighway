@@ -308,7 +308,10 @@
   box-sizing: border-box;
   border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 8px;
-  background: transparent;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: 50% 50%;
   color: #fff;
   font-size: 20px;
   font-family: inherit;
@@ -319,7 +322,7 @@
 }
 
 #shh-root .shh-touch-nav-btn:active {
-  background: rgba(255, 255, 255, 0.18);
+  background-color: rgba(255, 255, 255, 0.18);
 }
 
 #shh-root .shh-track-badge.shh-flash {
