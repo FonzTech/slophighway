@@ -22,4 +22,6 @@ export type ToDetached =
 export type FromDetached =
   | { type: "select"; partId: number }
   | { type: "set-standard"; enabled: boolean }
-  | { type: "toggle-play" };
+  | { type: "toggle-play" }
+  /** Seek one bar back/forward, replayed in the tab as the matching arrow key press. */
+  | { type: "arrow"; key: "ArrowLeft" | "ArrowRight" };

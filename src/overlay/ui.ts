@@ -1,24 +1,9 @@
 import { DETACHED_PORT, OPEN_DETACHED, type FromDetached, type ToDetached } from "../shared/detached";
 import type { RsArrangement } from "../songsterr/rocksmith";
 import { retuneToStandard } from "../songsterr/tuning";
-import { PlaybackClock, type HighwayView } from "./clock";
-import { Highway2D } from "./highway";
-import {
-  Highway3D,
-  chordShapeOptions,
-  cameraDistanceOptions,
-  nextChordsOptions,
-  parseCameraDistance,
-  type CameraDistance,
-  parseNextChords,
-  hasTouchSupport,
-  parseChordShapeSize,
-  parseQuality,
-  qualityOptions, webgl2Available,
-  type ChordShapeSize,
-  type Quality,
-} from "./host3d";
-import { mountControlsLegend, SongInfoBox, TrackBadge, trackHotkey, trackLabel, type SongInfo } from "./tracks";
+import { patchStored, loadStored } from "./settings";
+import { HighwayShell } from "./shell";
+import type { SongInfo } from "./tracks";
 
 export type OverlayController = {
   /** `preferredPartId` is the part Songsterr is showing; a manual pick in the overlay wins over it. */
@@ -29,12 +14,11 @@ export type OverlayController = {
   destroy: () => void;
 };
 
-type ViewMode = "3d" | "2d";
 type DockMode = "bottom" | "top" | "float";
 type FloatRect = { x: number; y: number; w: number; h: number };
 
-type Prefs = {
-  view: ViewMode;
+/** Preferences only the attached overlay has; the shared ones live in `settings.ts`. */
+type LayoutPrefs = {
   dock: DockMode;
   /** Stage height when docked at the top or bottom. */
   height: number;
@@ -42,33 +26,12 @@ type Prefs = {
   maximized: boolean;
   collapsed: boolean;
   transparent: boolean;
-  quality: Quality;
   /** Show every track re-fretted for E standard. */
   standard: boolean;
-  /** Enable on-screen touch controls (behavior to be defined). */
-  touchControls: boolean;
-  /** Size of the chord shape diagram at the top left of the highway. */
-  chordShape: ChordShapeSize;
-  nextChords: number;
-  cameraDistance: CameraDistance;
 };
 
-const PREFS_KEY = "shh-prefs";
 const MIN_HEIGHT = 120;
 const MIN_FLOAT_WIDTH = 360;
-const VERSION = "0.6.2";
-/** Hold time before a held side tap starts auto-repeating. */
-const TOUCH_REPEAT_DELAY_MS = 300;
-/** Fixed interval between auto-repeat presses while a side tap is held. */
-const TOUCH_REPEAT_INTERVAL_MS = 100;
-/** Tap zone (0–1 fraction of width) that counts as the touch play/pause button: min x. */
-const TOUCH_PLAY_MIN_X = 0.333;
-/** Tap zone (0–1 fraction of width) that counts as the touch play/pause button: max x. */
-const TOUCH_PLAY_MAX_X = 0.666;
-/** Tap zone (0–1 fraction of height) that counts as the touch play/pause button: min y. */
-const TOUCH_PLAY_MIN_Y = 0.333;
-/** Tap zone (0–1 fraction of height) that counts as the touch play/pause button: max y. */
-const TOUCH_PLAY_MAX_Y = 0.666;
 
 function defaultFloat(): FloatRect {
   const w = Math.round(window.innerWidth * 0.6);
@@ -76,48 +39,26 @@ function defaultFloat(): FloatRect {
   return { x: Math.round((window.innerWidth - w) / 2), y: 80, w, h };
 }
 
-function defaultPrefs(): Prefs {
+function defaultPrefs(): LayoutPrefs {
   return {
-    view: webgl2Available() ? "3d" : "2d",
     dock: "top",
     height: Math.round(window.innerHeight * 0.4),
     float: defaultFloat(),
     maximized: false,
     collapsed: false,
     transparent: false,
-    quality: "balanced",
     standard: false,
-    touchControls: hasTouchSupport(),
-    chordShape: "normal",
-    nextChords: 0,
-    cameraDistance: "normal",
   };
 }
 
-async function loadPrefs(): Promise<Prefs> {
+async function loadPrefs(): Promise<LayoutPrefs> {
   const base = defaultPrefs();
-  try {
-    const stored = (await chrome.storage.local.get(PREFS_KEY))[PREFS_KEY] as Partial<Prefs> | undefined;
-    return {
-      ...base,
-      ...stored,
-      float: { ...base.float, ...stored?.float },
-      quality: parseQuality(stored?.quality),
-      chordShape: parseChordShapeSize(stored?.chordShape),
-      nextChords: parseNextChords(stored?.nextChords),
-      cameraDistance: parseCameraDistance(stored?.cameraDistance),
-    };
-  } catch {
-    return base;
-  }
+  const stored = await loadStored<LayoutPrefs>();
+  return { ...base, ...stored, float: { ...base.float, ...stored?.float } };
 }
 
-function savePrefs(prefs: Prefs): void {
-  try {
-    void chrome.storage.local.set({ [PREFS_KEY]: prefs });
-  } catch {
-    // extension context can disappear after a reload; preferences are optional
-  }
+function savePrefs(prefs: LayoutPrefs): void {
+  void patchStored(prefs);
 }
 
 /** Cache of E-standard conversions so toggling or re-sending doesn't rebuild the chart. */
@@ -137,106 +78,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), M
 export function mountOverlay(): OverlayController {
   const root = document.createElement("div");
   root.id = "shh-root";
-  root.innerHTML = `
-    <div class="shh-panel">
-      <div class="shh-toolbar">
-        <div class="shh-brand">Slophighway v${VERSION}</div>
-        <select class="shh-select shh-arrangement" aria-label="Arrangement" title="Switch tracks with keys 1–9"></select>
-        <select class="shh-select shh-view" aria-label="View">
-          <option value="3d">3D</option>
-          <option value="2d">2D (light)</option>
-        </select>
-        <select class="shh-select shh-quality" aria-label="Quality" title="Lower quality renders fewer pixels and caps the frame rate at 60">
-          ${qualityOptions()}
-        </select>
-        <select class="shh-select shh-touch" aria-label="Touch controls" title="Enable on-screen touch controls">
-          <option value="yes">Touch controls: yes</option>
-          <option value="no">Touch controls: no</option>
-        </select>
-        <select class="shh-select shh-chord-shape" aria-label="Chord shape size" title="Size of the chord shape diagram at the top left">
-          ${chordShapeOptions()}
-        </select>
-        <select class="shh-select shh-next-chords" aria-label="Number of next chords" title="How many upcoming chords to list under the chord shape diagram">
-          ${nextChordsOptions()}
-        </select>
-        <select class="shh-select shh-camera-distance" aria-label="Camera distance" title="How far the 3D camera sits from the fretboard">
-          ${cameraDistanceOptions()}
-        </select>
-        <button type="button" class="shh-btn shh-std" title="Re-fret every track for E standard tuning"></button>
-        <select class="shh-select shh-dock" aria-label="Position">
-          <option value="top">Dock top</option>
-          <option value="bottom">Dock bottom</option>
-          <option value="float">Floating</option>
-        </select>
-        <button type="button" class="shh-btn shh-detach" title="Open the highway in its own window (second monitor, full screen)">Detach</button>
-        <button type="button" class="shh-btn shh-bg" title="Toggle the highway background"></button>
-        <button type="button" class="shh-btn shh-max" title="Full screen highway">Full</button>
-        <button type="button" class="shh-btn shh-collapse" title="Hide the highway">Hide</button>
-        <span class="shh-sync"></span>
-        <span class="shh-status"></span>
-      </div>
-      <div class="shh-stage"></div>
-      <div class="shh-resize" title="Drag to resize"></div>
-    </div>
-  `;
   document.documentElement.appendChild(root);
 
-  const panel = root.querySelector(".shh-panel") as HTMLDivElement;
-  const toolbar = root.querySelector(".shh-toolbar") as HTMLDivElement;
-  const stage = root.querySelector(".shh-stage") as HTMLDivElement;
-  const handle = root.querySelector(".shh-resize") as HTMLDivElement;
-  const arrangementSelect = root.querySelector(".shh-arrangement") as HTMLSelectElement;
-  const viewSelect = root.querySelector(".shh-view") as HTMLSelectElement;
-  const dockSelect = root.querySelector(".shh-dock") as HTMLSelectElement;
-  const qualitySelect = root.querySelector(".shh-quality") as HTMLSelectElement;
-  const touchSelect = root.querySelector(".shh-touch") as HTMLSelectElement;
-  const chordShapeSelect = root.querySelector(".shh-chord-shape") as HTMLSelectElement;
-  const nextChordsSelect = root.querySelector(".shh-next-chords") as HTMLSelectElement;
-  const cameraDistanceSelect = root.querySelector(".shh-camera-distance") as HTMLSelectElement;
-  const stdBtn = root.querySelector(".shh-std") as HTMLButtonElement;
-  const detachBtn = root.querySelector(".shh-detach") as HTMLButtonElement;
-  const bgBtn = root.querySelector(".shh-bg") as HTMLButtonElement;
-  const maxBtn = root.querySelector(".shh-max") as HTMLButtonElement;
-  const collapseBtn = root.querySelector(".shh-collapse") as HTMLButtonElement;
-  const status = root.querySelector(".shh-status") as HTMLSpanElement;
-  const sync = root.querySelector(".shh-sync") as HTMLSpanElement;
-
-  if (!webgl2Available()) {
-    viewSelect.querySelector('option[value="3d"]')?.setAttribute("disabled", "");
-  }
-
-  const clock = new PlaybackClock();
-  const badge = new TrackBadge(stage);
-  const info = new SongInfoBox(stage);
-  const barReadout = mountControlsLegend(stage, clock);
-  const dispatchArrow = (key: "ArrowLeft" | "ArrowRight") => {
-    const keyCode = key === "ArrowRight" ? 39 : 37;
-    document.dispatchEvent(
-      new KeyboardEvent("keydown", { key, code: key, keyCode, which: keyCode, bubbles: true, cancelable: true }),
-    );
-  };
-  let repeatDelay: number | undefined;
-  let repeatTimer: number | undefined;
-  const stopRepeat = () => {
-    if (repeatDelay !== undefined) {
-      clearTimeout(repeatDelay);
-      repeatDelay = undefined;
-    }
-    if (repeatTimer !== undefined) {
-      clearInterval(repeatTimer);
-      repeatTimer = undefined;
-    }
-  };
-  const startRepeat = (key: "ArrowLeft" | "ArrowRight") => {
-    stopRepeat();
-    dispatchArrow(key);
-    repeatDelay = window.setTimeout(() => {
-      repeatDelay = undefined;
-      repeatTimer = window.setInterval(() => dispatchArrow(key), TOUCH_REPEAT_INTERVAL_MS);
-    }, TOUCH_REPEAT_DELAY_MS);
-  };
   let prefs = defaultPrefs();
-  let view: HighwayView | null = null;
   let arrangements: RsArrangement[] = [];
   let current: RsArrangement | null = null;
   let song: SongInfo | null = null;
@@ -244,6 +88,40 @@ export function mountOverlay(): OverlayController {
   const ports = new Set<chrome.runtime.Port>();
   let lastPlayback: ToDetached | null = null;
   const detached = () => ports.size > 0;
+
+  const dispatchArrow = (key: "ArrowLeft" | "ArrowRight") => {
+    const keyCode = key === "ArrowRight" ? 39 : 37;
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key, code: key, keyCode, which: keyCode, bubbles: true, cancelable: true }),
+    );
+  };
+
+  const togglePlayback = () => {
+    const play = document.getElementById("control-play");
+    if (play) play.click();
+    else shell.setStatus("play button not found on this page");
+  };
+
+  const shell: HighwayShell = new HighwayShell(
+    root,
+    "attached",
+    {
+      selectTrack: (partId) => pickTrack(partId),
+      setStandard: (enabled) => setStandard(enabled),
+      togglePlay: togglePlayback,
+      sendArrow: dispatchArrow,
+    },
+    { transparent: () => prefs.transparent },
+  );
+
+  const { panel, toolbar, stage } = shell;
+  const handle = root.querySelector(".shh-resize") as HTMLDivElement;
+  const dockSelect = root.querySelector(".shh-dock") as HTMLSelectElement;
+  const detachBtn = root.querySelector(".shh-detach") as HTMLButtonElement;
+  const bgBtn = root.querySelector(".shh-bg") as HTMLButtonElement;
+  const maxBtn = root.querySelector(".shh-max") as HTMLButtonElement;
+  const collapseBtn = root.querySelector(".shh-collapse") as HTMLButtonElement;
+  const sync = root.querySelector(".shh-sync") as HTMLSpanElement;
 
   const sendDetached = (msg: ToDetached, only?: chrome.runtime.Port) => {
     for (const port of only ? [only] : ports) {
@@ -255,7 +133,7 @@ export function mountOverlay(): OverlayController {
     }
   };
 
-  const update = (patch: Partial<Prefs>, persist = true) => {
+  const update = (patch: Partial<LayoutPrefs>, persist = true) => {
     prefs = { ...prefs, ...patch };
     if (persist) savePrefs(prefs);
     applyLayout();
@@ -270,7 +148,6 @@ export function mountOverlay(): OverlayController {
     root.classList.toggle("shh-collapsed", collapsed);
     root.classList.toggle("shh-is-detached", detached());
     root.classList.toggle("shh-transparent", prefs.transparent);
-    root.classList.toggle("shh-touch-controls", prefs.touchControls);
     const s = root.style;
     s.left = s.right = s.top = s.bottom = s.width = "";
 
@@ -299,38 +176,12 @@ export function mountOverlay(): OverlayController {
     stage.style.height = collapsed ? "0px" : `${Math.max(0, stageH)}px`;
 
     dockSelect.value = prefs.dock;
-    qualitySelect.value = prefs.quality;
-    touchSelect.value = prefs.touchControls ? "yes" : "no";
-    chordShapeSelect.value = prefs.chordShape;
-    nextChordsSelect.value = String(prefs.nextChords);
-    cameraDistanceSelect.value = prefs.cameraDistance;
-    stdBtn.textContent = prefs.standard ? "E Std: on" : "E Std: off";
-    stdBtn.classList.toggle("shh-on", prefs.standard);
     detachBtn.textContent = detached() ? "Attach" : "Detach";
     bgBtn.textContent = prefs.transparent ? "BG: clear" : "BG: solid";
     maxBtn.textContent = prefs.maximized ? "Exit full" : "Full";
     collapseBtn.textContent = prefs.collapsed ? "Show" : "Hide";
-    view?.resize();
-  };
-
-  const createView = () => {
-    view?.destroy();
-    view = null;
-    // the detached window does the rendering; keep the tab's GPU idle meanwhile
-    if (detached()) return;
-    try {
-      view =
-        prefs.view === "3d" && webgl2Available()
-          ? new Highway3D(stage, clock, (text) => (status.textContent = text), prefs.transparent, prefs.quality, prefs.chordShape, prefs.nextChords, prefs.cameraDistance)
-          : new Highway2D(stage, clock, prefs.transparent);
-    } catch (err) {
-      console.error("[slophighway] view init failed", err);
-      status.textContent = `view failed: ${String(err)}`;
-      return;
-    }
-    viewSelect.value = prefs.view;
-    view.setArrangement(shown());
-    view.resize();
+    shell.syncControls();
+    shell.view?.resize();
   };
 
   const shown = () => displayArrangement(current, prefs.standard);
@@ -338,16 +189,11 @@ export function mountOverlay(): OverlayController {
   /** Pushes the displayed chart to the view, the on-stage labels and any detached window. */
   const publishCurrent = (flash: boolean) => {
     const arr = shown();
-    if (current) badge.show(arrangements.indexOf(current), current.name, flash);
-    else badge.clear();
-    info.setArrangement(arr);
-    barReadout.setArrangement(arr);
-    view?.setArrangement(arr);
+    shell.setArrangement(arr, flash);
     sendDetached({ type: "arrangement", arrangement: arr });
   };
 
-  const applySelection = (flash = false) => {
-    const partId = Number(arrangementSelect.value);
+  const applySelection = (partId: number | undefined, flash = false) => {
     const next = arrangements.find((a) => a.partId === partId) ?? arrangements[0] ?? null;
     if (next === current) return;
     current = next;
@@ -357,40 +203,15 @@ export function mountOverlay(): OverlayController {
   const setStandard = (enabled: boolean) => {
     if (enabled === prefs.standard) return;
     update({ standard: enabled });
+    shell.setStandard(enabled);
     publishCurrent(false);
     sendDetached({ type: "settings", standard: enabled });
   };
-  stdBtn.addEventListener("click", () => setStandard(!prefs.standard));
-
-  qualitySelect.addEventListener("change", () => {
-    update({ quality: parseQuality(qualitySelect.value) });
-    if (view instanceof Highway3D) view.setQuality(prefs.quality);
-  });
-
-  touchSelect.addEventListener("change", () => {
-    update({ touchControls: touchSelect.value === "yes" });
-  });
-
-  chordShapeSelect.addEventListener("change", () => {
-    update({ chordShape: parseChordShapeSize(chordShapeSelect.value) });
-    if (view instanceof Highway3D) view.setChordShapeSize(prefs.chordShape);
-  });
-
-  nextChordsSelect.addEventListener("change", () => {
-    update({ nextChords: parseNextChords(nextChordsSelect.value) });
-    if (view instanceof Highway3D) view.setNextChordCount(prefs.nextChords);
-  });
-
-  cameraDistanceSelect.addEventListener("change", () => {
-    update({ cameraDistance: parseCameraDistance(cameraDistanceSelect.value) });
-    if (view instanceof Highway3D) view.setCameraDistance(prefs.cameraDistance);
-  });
 
   const pickTrack = (partId: number) => {
     if (!arrangements.some((a) => a.partId === partId)) return;
     userPick = partId;
-    arrangementSelect.value = String(partId);
-    applySelection(true);
+    applySelection(partId, true);
   };
 
   const trackSummaries = (): ToDetached => ({
@@ -398,25 +219,13 @@ export function mountOverlay(): OverlayController {
     tracks: arrangements.map(({ partId, name, noteCount }) => ({ partId, name, noteCount })),
   });
 
-  arrangementSelect.addEventListener("change", () => pickTrack(Number(arrangementSelect.value)));
-
-  const onKeyDown = (e: KeyboardEvent) => {
-    const index = trackHotkey(e);
-    if (index == null || !arrangements[index]) return;
-    pickTrack(arrangements[index].partId);
-  };
-  window.addEventListener("keydown", onKeyDown, true);
-  viewSelect.addEventListener("change", () => {
-    update({ view: viewSelect.value === "2d" ? "2d" : "3d" });
-    createView();
-  });
   dockSelect.addEventListener("change", () => {
     const dock = dockSelect.value as DockMode;
     update({ dock, maximized: false, collapsed: false });
   });
   bgBtn.addEventListener("click", () => {
     update({ transparent: !prefs.transparent });
-    createView();
+    shell.createView();
   });
   detachBtn.addEventListener("click", () => {
     if (detached()) {
@@ -426,40 +235,8 @@ export function mountOverlay(): OverlayController {
     try {
       void chrome.runtime.sendMessage({ type: OPEN_DETACHED });
     } catch (err) {
-      status.textContent = `detach failed: ${String(err)} (reload the page)`;
+      shell.setStatus(`detach failed: ${String(err)} (reload the page)`);
     }
-  });
-
-  const togglePlayback = () => {
-    const play = document.getElementById("control-play");
-    if (play) play.click();
-    else status.textContent = "play button not found on this page";
-  };
-
-  stage.addEventListener("pointerdown", (e) => {
-    if (!prefs.touchControls) return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    const w = stage.clientWidth;
-    const h = stage.clientHeight;
-    if (!w || !h) return;
-    const rect = stage.getBoundingClientRect();
-    const nx = e.clientX - rect.left;
-    const ny = e.clientY - rect.top;
-    if (ny >= h * TOUCH_PLAY_MIN_Y && ny <= h * TOUCH_PLAY_MAX_Y) {
-      if (nx < w * TOUCH_PLAY_MIN_X) {
-        startRepeat("ArrowLeft");
-      } else if (nx > w * TOUCH_PLAY_MAX_X) {
-        startRepeat("ArrowRight");
-      } else  {
-        togglePlayback();
-      }
-    }
-  });
-  for (const stop of ["pointerup", "pointerleave", "pointercancel"]) {
-    stage.addEventListener(stop, stopRepeat);
-  }
-  stage.addEventListener("contextmenu", (e) => {
-    if (prefs.touchControls) e.preventDefault();
   });
 
   const onConnect = (port: chrome.runtime.Port) => {
@@ -475,15 +252,17 @@ export function mountOverlay(): OverlayController {
       if (msg?.type === "select") pickTrack(msg.partId);
       else if (msg?.type === "set-standard") setStandard(msg.enabled);
       else if (msg?.type === "toggle-play") togglePlayback();
+      else if (msg?.type === "arrow") dispatchArrow(msg.key);
     });
     port.onDisconnect.addListener(() => {
       ports.delete(port);
       if (detached()) return;
       applyLayout();
-      createView();
+      shell.setSuspended(false);
     });
     if (!wasDetached) {
-      createView();
+      // the detached window does the rendering; keep the tab's GPU idle meanwhile
+      shell.setSuspended(true);
       applyLayout();
     }
   };
@@ -527,8 +306,6 @@ export function mountOverlay(): OverlayController {
     dragWith(toolbar, down, (dx, dy) => update({ float: { ...start, x: start.x + dx, y: start.y + dy } }, false));
   });
 
-  const resizeObserver = new ResizeObserver(() => view?.resize());
-  resizeObserver.observe(stage);
   let toolbarH = 0;
   const toolbarObserver = new ResizeObserver(() => {
     if (toolbar.offsetHeight === toolbarH) return;
@@ -540,23 +317,13 @@ export function mountOverlay(): OverlayController {
   window.addEventListener("resize", onWindowResize);
 
   applyLayout();
-  createView();
   void loadPrefs().then((loaded) => {
-    const rebuild = loaded.view !== prefs.view || loaded.transparent !== prefs.transparent;
+    const rebuild = loaded.transparent !== prefs.transparent;
     const restandard = loaded.standard !== prefs.standard;
-    const requality = loaded.quality !== prefs.quality;
-    const reshape = loaded.chordShape !== prefs.chordShape;
-    const renext = loaded.nextChords !== prefs.nextChords;
-    const recamera = loaded.cameraDistance !== prefs.cameraDistance;
     prefs = loaded;
+    shell.setStandard(prefs.standard);
     applyLayout();
-    if (rebuild) createView();
-    else if (view instanceof Highway3D) {
-      if (requality) view.setQuality(prefs.quality);
-      if (reshape) view.setChordShapeSize(prefs.chordShape);
-      if (renext) view.setNextChordCount(prefs.nextChords);
-      if (recamera) view.setCameraDistance(prefs.cameraDistance);
-    }
+    if (rebuild) shell.createView();
     if (restandard) publishCurrent(false);
   });
 
@@ -570,14 +337,9 @@ export function mountOverlay(): OverlayController {
         )
         .sort((a, b) => a.partId - b.partId);
 
-      arrangementSelect.innerHTML = "";
-      arrangements.forEach((a, i) => {
-        const opt = document.createElement("option");
-        opt.value = String(a.partId);
-        opt.textContent = trackLabel(i, a.name, a.noteCount);
-        arrangementSelect.appendChild(opt);
-      });
-      sendDetached(trackSummaries());
+      const summaries = trackSummaries();
+      if (summaries.type === "tracks") shell.setTracks(summaries.tracks);
+      sendDetached(summaries);
 
       const byId = (id: number | null | undefined) =>
         id == null ? undefined : arrangements.find((a) => a.partId === id);
@@ -587,8 +349,8 @@ export function mountOverlay(): OverlayController {
         byId(current?.partId) ??
         arrangements.find((a) => /guit/i.test(`${a.instrument} ${a.name}`)) ??
         arrangements[0];
-      if (chosen) arrangementSelect.value = String(chosen.partId);
-      applySelection();
+      if (chosen) shell.selectTrackSilently(chosen.partId);
+      applySelection(chosen?.partId);
       if (!arrangements.length) {
         current = null;
         if (!items.length) userPick = null;
@@ -597,29 +359,25 @@ export function mountOverlay(): OverlayController {
     },
     setSongInfo(next) {
       song = next;
-      info.setSong(song);
+      shell.setSong(song);
       sendDetached({ type: "song", song });
     },
     setPlayback(timeMs, playing, speed, source) {
-      clock.set(timeMs, playing, speed);
+      shell.setPlayback(timeMs, playing, speed);
       lastPlayback = { type: "playback", timeMs, playing, speed, sentAt: Date.now() };
       sendDetached(lastPlayback);
       if (source) sync.textContent = `sync:${source}`;
     },
     setStatus(text) {
-      status.textContent = text;
+      shell.setStatus(text);
     },
     destroy() {
-      resizeObserver.disconnect();
       toolbarObserver.disconnect();
       chrome.runtime.onConnect.removeListener(onConnect);
-      window.removeEventListener("keydown", onKeyDown, true);
       for (const port of ports) port.disconnect();
       ports.clear();
       window.removeEventListener("resize", onWindowResize);
-      stopRepeat();
-      view?.destroy();
-      barReadout.destroy();
+      shell.destroy();
       root.remove();
     },
   };
