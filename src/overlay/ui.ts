@@ -201,7 +201,8 @@ export function mountOverlay(): OverlayController {
         repeatTimer = undefined;
       }
     };
-    arrow.addEventListener("pointerdown", () => {
+    arrow.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       stopRepeat();
       dispatchArrow(arrow);
       repeatDelay = window.setTimeout(() => {
