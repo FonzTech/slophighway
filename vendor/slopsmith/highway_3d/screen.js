@@ -1908,6 +1908,7 @@
         // Wall-clock stamps of the last chord change, so the entrance and crossfade still finish while paused.
         let _diagKeyWall          = 0;
         let _diagPrevStartWall    = 0;
+        let _diagNextNames        = [];
         let _diagLastKey          = null;  // chord identity: name + '|' + frets.join(',')
         // Per-wave cache for fret-column reference markers. Keyed by the
         // wave's beat timestamp. We snapshot { hasLow, hasHigh, fretList,
@@ -3267,6 +3268,58 @@
                         ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
                     }
                 }
+            }
+
+            ctx.restore();
+        }
+
+        // Static list of upcoming chord names under the chord diagram's slot. It reuses the
+        // diagram's layout (without the "Nfr" padding) so it never fades or scales with the box.
+        function drawNextChords(ctx, opts) {
+            const {
+                names, canvasW = 600, canvasH = 400,
+                sizeSlider = 0.5, position = 'tl', nStr = 6,
+                lyricsBottom = 0, scale: userScale = 1,
+            } = opts;
+            if (!names || !names.length) return;
+            const COLS = nStr, ROWS = 4;
+            const sizeF = DIAG_SIZE_MIN + (DIAG_SIZE_MAX - DIAG_SIZE_MIN) * sizeSlider;
+            const isTopCorner = position === 'tl' || position === 'tr';
+            const availH = canvasH - (isTopCorner ? lyricsBottom : 0);
+            const cellEst = Math.max(1, Math.min(
+                Math.round(availH * sizeF * userScale / (ROWS + 3)),
+                DIAG_CELL_MAX * userScale,
+            ));
+            const CELL = Math.max(1, Math.min(
+                cellEst,
+                Math.floor(canvasW / (COLS + 0.3)),
+                Math.floor((canvasW - 12) / Math.max(1, COLS - 1)),
+            ));
+            const PAD = Math.max(6, Math.round(CELL * 0.65));
+            const boxW = CELL * (COLS - 1) + 2 * PAD;
+            const boxH = Math.round(CELL * 1.6) + Math.round(CELL * 0.7) + CELL * ROWS + PAD;
+            const TOP_Y = Math.round(Math.max(PAD + canvasH * 0.06, lyricsBottom + PAD));
+            let bx, by;
+            if      (position === 'tr') { bx = canvasW - boxW - PAD; by = TOP_Y; }
+            else if (position === 'bl') { bx = PAD; by = canvasH - boxH - PAD; }
+            else if (position === 'br') { bx = canvasW - boxW - PAD; by = canvasH - boxH - PAD; }
+            else                        { bx = PAD; by = TOP_Y; }
+            bx = Math.max(0, Math.min(canvasW - boxW, bx));
+            by = Math.max(0, Math.min(canvasH - boxH, by));
+
+            const fontPx = Math.max(8, Math.round(CELL * 0.75));
+            const lineH = Math.round(fontPx * 1.3);
+            const gap = Math.round(CELL * 0.4);
+            const listH = lineH * names.length;
+            const below = by + boxH + gap + listH <= canvasH;
+            const y0 = below ? by + boxH + gap : by - gap - listH;
+            ctx.save();
+            ctx.font = `bold ${fontPx}px sans-serif`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(232,208,128,0.85)';
+            for (let i = 0; i < names.length; i++) {
+                ctx.fillText(names[i], bx + PAD, y0 + lineH * (i + 0.5));
             }
             ctx.restore();
         }
@@ -7738,6 +7791,23 @@
             // ── Chord diagram: track chord, drive entrance + crossfade animations ─
             {
                 let newChord = null;
+                {
+                    // Next distinct chord names after the one on screen (chords are time-ordered).
+                    const want = Math.max(0, Math.min(5, Math.round(Number(bundle.nextChordCount) || 0)));
+                    const names = [];
+                    if (want && chords) {
+                        let last = _diagChord ? _diagChord.name : null;
+                        for (const ch of chords) {
+                            if (names.length >= want) break;
+                            if (!ch.notes || ch.t <= now) continue;
+                            const lbl = chordTemplateLabel(bundle.chordTemplates?.[ch.id]);
+                            if (!lbl || lbl === last) continue;
+                            names.push(lbl);
+                            last = lbl;
+                        }
+                    }
+                    _diagNextNames = names;
+                }
                 if (chords) {
                     let bestT = -Infinity;
                     for (const ch of chords) {
@@ -9125,6 +9195,13 @@
                             scale: Number(bundle.chordDiagramScale) || 1,
                         });
                     }
+                    drawNextChords(lyricsCtx, {
+                        names: _diagNextNames,
+                        canvasW: lyricsCanvas.width, canvasH: lyricsCanvas.height,
+                        sizeSlider: chordDiagramSize, position: chordDiagramPosition,
+                        nStr, lyricsBottom,
+                        scale: Number(bundle.chordDiagramScale) || 1,
+                    });
                     if (sectionHudVisible && bundle.sections && bundle.sections.length) {
                         drawSectionHud(lyricsCtx, {
                             sections: bundle.sections,

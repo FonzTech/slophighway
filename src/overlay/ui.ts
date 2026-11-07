@@ -6,6 +6,8 @@ import { Highway2D } from "./highway";
 import {
   Highway3D,
   chordShapeOptions,
+  nextChordsOptions,
+  parseNextChords,
   hasTouchSupport,
   parseChordShapeSize,
   parseQuality,
@@ -44,6 +46,7 @@ type Prefs = {
   touchControls: boolean;
   /** Size of the chord shape diagram at the top left of the highway. */
   chordShape: ChordShapeSize;
+  nextChords: number;
 };
 
 const PREFS_KEY = "shh-prefs";
@@ -82,6 +85,7 @@ function defaultPrefs(): Prefs {
     standard: false,
     touchControls: hasTouchSupport(),
     chordShape: "normal",
+    nextChords: 0,
   };
 }
 
@@ -95,6 +99,7 @@ async function loadPrefs(): Promise<Prefs> {
       float: { ...base.float, ...stored?.float },
       quality: parseQuality(stored?.quality),
       chordShape: parseChordShapeSize(stored?.chordShape),
+      nextChords: parseNextChords(stored?.nextChords),
     };
   } catch {
     return base;
@@ -145,6 +150,9 @@ export function mountOverlay(): OverlayController {
         <select class="shh-select shh-chord-shape" aria-label="Chord shape size" title="Size of the chord shape diagram at the top left">
           ${chordShapeOptions()}
         </select>
+        <select class="shh-select shh-next-chords" aria-label="Number of next chords" title="How many upcoming chords to list under the chord shape diagram">
+          ${nextChordsOptions()}
+        </select>
         <button type="button" class="shh-btn shh-std" title="Re-fret every track for E standard tuning"></button>
         <select class="shh-select shh-dock" aria-label="Position">
           <option value="top">Dock top</option>
@@ -174,6 +182,7 @@ export function mountOverlay(): OverlayController {
   const qualitySelect = root.querySelector(".shh-quality") as HTMLSelectElement;
   const touchSelect = root.querySelector(".shh-touch") as HTMLSelectElement;
   const chordShapeSelect = root.querySelector(".shh-chord-shape") as HTMLSelectElement;
+  const nextChordsSelect = root.querySelector(".shh-next-chords") as HTMLSelectElement;
   const stdBtn = root.querySelector(".shh-std") as HTMLButtonElement;
   const detachBtn = root.querySelector(".shh-detach") as HTMLButtonElement;
   const bgBtn = root.querySelector(".shh-bg") as HTMLButtonElement;
@@ -283,6 +292,7 @@ export function mountOverlay(): OverlayController {
     qualitySelect.value = prefs.quality;
     touchSelect.value = prefs.touchControls ? "yes" : "no";
     chordShapeSelect.value = prefs.chordShape;
+    nextChordsSelect.value = String(prefs.nextChords);
     stdBtn.textContent = prefs.standard ? "E Std: on" : "E Std: off";
     stdBtn.classList.toggle("shh-on", prefs.standard);
     detachBtn.textContent = detached() ? "Attach" : "Detach";
@@ -300,7 +310,7 @@ export function mountOverlay(): OverlayController {
     try {
       view =
         prefs.view === "3d" && webgl2Available()
-          ? new Highway3D(stage, clock, (text) => (status.textContent = text), prefs.transparent, prefs.quality, prefs.chordShape)
+          ? new Highway3D(stage, clock, (text) => (status.textContent = text), prefs.transparent, prefs.quality, prefs.chordShape, prefs.nextChords)
           : new Highway2D(stage, clock, prefs.transparent);
     } catch (err) {
       console.error("[slophighway] view init failed", err);
@@ -353,6 +363,11 @@ export function mountOverlay(): OverlayController {
   chordShapeSelect.addEventListener("change", () => {
     update({ chordShape: parseChordShapeSize(chordShapeSelect.value) });
     if (view instanceof Highway3D) view.setChordShapeSize(prefs.chordShape);
+  });
+
+  nextChordsSelect.addEventListener("change", () => {
+    update({ nextChords: parseNextChords(nextChordsSelect.value) });
+    if (view instanceof Highway3D) view.setNextChordCount(prefs.nextChords);
   });
 
   const pickTrack = (partId: number) => {
@@ -513,12 +528,14 @@ export function mountOverlay(): OverlayController {
     const restandard = loaded.standard !== prefs.standard;
     const requality = loaded.quality !== prefs.quality;
     const reshape = loaded.chordShape !== prefs.chordShape;
+    const renext = loaded.nextChords !== prefs.nextChords;
     prefs = loaded;
     applyLayout();
     if (rebuild) createView();
     else if (view instanceof Highway3D) {
       if (requality) view.setQuality(prefs.quality);
       if (reshape) view.setChordShapeSize(prefs.chordShape);
+      if (renext) view.setNextChordCount(prefs.nextChords);
     }
     if (restandard) publishCurrent(false);
   });

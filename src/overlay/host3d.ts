@@ -78,6 +78,17 @@ export function parseChordShapeSize(value: unknown): ChordShapeSize {
   return value === "big" || value === "bigger" || value === "biggest" ? value : "normal";
 }
 
+export const MAX_NEXT_CHORDS = 5;
+
+export function nextChordsOptions(): string {
+  return Array.from({ length: MAX_NEXT_CHORDS + 1 }, (_, n) => `<option value="${n}">Number of next chords: ${n}</option>`).join("");
+}
+
+export function parseNextChords(value: unknown): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.max(0, Math.min(MAX_NEXT_CHORDS, n)) : 0;
+}
+
 export function webgl2Available(): boolean {
   try {
     return !!document.createElement("canvas").getContext("webgl2");
@@ -102,6 +113,7 @@ export class Highway3D implements HighwayView {
   private transparent: boolean;
   private quality: QualitySpec;
   private chordShape: ChordShapeSize;
+  private nextChords: number;
   private lastFrame = 0;
   private frameBudget = 0;
 
@@ -112,6 +124,7 @@ export class Highway3D implements HighwayView {
     transparent = false,
     quality: Quality = "balanced",
     chordShape: ChordShapeSize = "normal",
+    nextChords = 0,
   ) {
     this.stage = stage;
     this.clock = clock;
@@ -119,6 +132,7 @@ export class Highway3D implements HighwayView {
     this.transparent = transparent;
     this.quality = QUALITY[quality];
     this.chordShape = chordShape;
+    this.nextChords = nextChords;
     this.canvas = document.createElement("canvas");
     this.canvas.className = "shh-canvas shh-canvas-3d";
     stage.appendChild(this.canvas);
@@ -156,6 +170,11 @@ export class Highway3D implements HighwayView {
   setChordShapeSize(size: ChordShapeSize): void {
     this.chordShape = size;
     if (this.bundle) this.bundle.chordDiagramScale = CHORD_SHAPE_SCALE[size];
+  }
+
+  setNextChordCount(count: number): void {
+    this.nextChords = count;
+    if (this.bundle) this.bundle.nextChordCount = count;
   }
 
   /** The renderer multiplies this by min(devicePixelRatio, 2). */
@@ -203,6 +222,7 @@ export class Highway3D implements HighwayView {
       lefty: false,
       renderScale: this.renderScale(),
       chordDiagramScale: CHORD_SHAPE_SCALE[this.chordShape],
+      nextChordCount: this.nextChords,
       lyricsVisible: false,
       getNoteState: () => null,
     };
