@@ -1,4 +1,10 @@
-import { cameraDistanceOptions, chordShapeOptions, nextChordsOptions, qualityOptions } from "./host3d";
+import {
+  cameraDistanceOptions,
+  chordOrientationOptions,
+  chordShapeOptions,
+  nextChordsOptions,
+  qualityOptions,
+} from "./host3d";
 
 export type ShellMode = "attached" | "detached";
 
@@ -80,6 +86,9 @@ export function panelHtml(mode: ShellMode): string {
                 <select class="shh-select shh-show-string-notes" aria-label="Show string open notes" title="Letter each string (E A D G B e) on the chord shape box">
                   <option value="no">Show string open notes: No</option>
                   <option value="yes">Show string open notes: Yes</option>
+                </select>
+                <select class="shh-select shh-chord-orientation" aria-label="Chord shape orientation" title="Rotate the chord shape box">
+                  ${chordOrientationOptions()}
                 </select>
               </div>
             </div>

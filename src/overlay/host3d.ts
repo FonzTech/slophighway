@@ -79,6 +79,33 @@ export function parseChordShapeSize(value: unknown): ChordShapeSize {
   return value === "big" || value === "bigger" || value === "biggest" ? value : "normal";
 }
 
+export type ChordOrientation = "normal" | "90" | "180" | "270";
+
+/** Rotation (degrees clockwise) applied to the chord-shape box, per drop-down value. */
+export const CHORD_ORIENTATION_DEG: Record<ChordOrientation, number> = {
+  normal: 0,
+  "90": 90,
+  "180": 180,
+  "270": 270,
+};
+
+export const CHORD_ORIENTATION_LABELS: Record<ChordOrientation, string> = {
+  normal: "Chord shape orientation: Normal",
+  "90": "Chord shape orientation: 90 degrees",
+  "180": "Chord shape orientation: 180 degrees",
+  "270": "Chord shape orientation: 270 degrees",
+};
+
+export function chordOrientationOptions(): string {
+  return (Object.keys(CHORD_ORIENTATION_LABELS) as ChordOrientation[])
+    .map((c) => `<option value="${c}">${CHORD_ORIENTATION_LABELS[c]}</option>`)
+    .join("");
+}
+
+export function parseChordOrientation(value: unknown): ChordOrientation {
+  return value === "90" || value === "180" || value === "270" ? value : "normal";
+}
+
 export type CameraDistance = "farthest" | "farther" | "far" | "normal" | "near" | "nearer" | "nearest";
 
 /** Multiplier on the renderer's camera distance for each option; 1 is the renderer's own distance. */
@@ -151,6 +178,7 @@ export class Highway3D implements HighwayView {
   private cameraDistance: CameraDistance;
   private chordOverride: boolean;
   private showStringOpenNotes: boolean;
+  private chordOrientation: ChordOrientation;
   private arrangement: RsArrangement | null = null;
   private lastFrame = 0;
   private frameBudget = 0;
@@ -166,6 +194,7 @@ export class Highway3D implements HighwayView {
     cameraDistance: CameraDistance = "normal",
     chordOverride = false,
     showStringOpenNotes = false,
+    chordOrientation: ChordOrientation = "normal",
   ) {
     this.stage = stage;
     this.clock = clock;
@@ -177,6 +206,7 @@ export class Highway3D implements HighwayView {
     this.cameraDistance = cameraDistance;
     this.chordOverride = chordOverride;
     this.showStringOpenNotes = showStringOpenNotes;
+    this.chordOrientation = chordOrientation;
     this.canvas = document.createElement("canvas");
     this.canvas.className = "shh-canvas shh-canvas-3d";
     stage.appendChild(this.canvas);
@@ -241,6 +271,11 @@ export class Highway3D implements HighwayView {
     if (this.bundle) this.bundle.showStringOpenNotes = enabled;
   }
 
+  setChordOrientation(orientation: ChordOrientation): void {
+    this.chordOrientation = orientation;
+    if (this.bundle) this.bundle.chordDiagramRotation = CHORD_ORIENTATION_DEG[orientation];
+  }
+
   /** The renderer multiplies this by min(devicePixelRatio, 2). */
   private renderScale(): number {
     const { pixelRatio } = this.quality;
@@ -289,6 +324,7 @@ export class Highway3D implements HighwayView {
       nextChordCount: this.nextChords,
       cameraDistanceMul: CAMERA_DISTANCE_FACTOR[this.cameraDistance],
       showStringOpenNotes: this.showStringOpenNotes,
+      chordDiagramRotation: CHORD_ORIENTATION_DEG[this.chordOrientation],
       stringNoteLetters: stringNoteLetters(arr),
       lyricsVisible: false,
       getNoteState: () => null,

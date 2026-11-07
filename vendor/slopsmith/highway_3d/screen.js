@@ -2971,6 +2971,7 @@
                 scale: userScale = 1,
                 showStringOpenNotes = false,
                 stringNoteLetters = [],
+                rotation = 0,
             } = opts;
 
             // Responsive sizing — CELL derived from panel height + user slider.
@@ -3120,24 +3121,132 @@
                 ctx.fillText(quality, nameStartX + rootW + 2, nameY);
             }
 
+            // Vertical nudge applied to everything tied to the fingering (the shape itself,
+            // the open-string letters, and the starting-fret number) for a given orientation:
+            // 180° moves it up 12px, 90°/270° up 16px. Plus a horizontal nudge for 270°.
+            const shiftY = rotation === 180 ? -12 : ((rotation % 180) !== 0 ? -16 : 0);
+            const shiftX = rotation === 270 ? 8 : 0;
+
+            // String open-note letters (e.g. "EADGBe") centered in their own band between
+            // the chord name and the string markers. Case marks string register: the LOWEST
+            // occurrence of each pitch class is uppercase, every higher repeat is lowercase
+            // (standard EADGBE -> EADGBe with lowercase "e" = high E; GDDDDD -> GDdddd), so
+            // players can tell the low string from its higher octave(s).
+            if (showStringOpenNotes && (rotation % 180) === 0) {
+                // 0°/180°: letters stay in the horizontal band between the title and the
+                // markers, drawn OUTSIDE the fingering-rotation transform so they stay
+                // upright (they do not rotate with the shape at 180°).
+                const fontPx = Math.max(9, Math.round(CELL * 0.7));
+                ctx.save();
+                ctx.font = `bold ${fontPx}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const letterY = by + HEADER + STR_LABEL * 0.5;
+                // Displayed strings run low-to-high (left = low E) so the label reads like a
+                // conventional tuning, e.g. "EADGBe".
+                const seenUp = new Set();
+                for (let col = 0; col < COLS; col++) {
+                    const strIdx = getStrIdx(col);
+                    // Reverse the high-first template order so col 0 shows the low string.
+                    const letter = stringNoteLetters ? stringNoteLetters[COLS - 1 - strIdx] : undefined;
+                    if (!letter) continue;
+                    const base = letter.toUpperCase();
+                    const label = seenUp.has(base) ? base.toLowerCase() : base;
+                    seenUp.add(base);
+                    ctx.fillStyle = (strIdx === 0 || strIdx === 1) ? '#e8d080' : 'rgba(255,255,255,0.55)';
+                    ctx.fillText(label, gx + col * CELL, letterY);
+                }
+                ctx.restore();
+            } else if (showStringOpenNotes && (rotation % 180) !== 0) {
+                // 90°/270°: the fingering becomes a horizontal shape (strings stacked
+                // vertically), so the letters move to the LEFT edge and stack in column
+                // order, one per string, reading top-to-bottom. The glyphs themselves stay
+                // upright (not rotated with the shape); only their positions follow the
+                // rotated grid.
+                const fontPx = Math.max(9, Math.round(CELL * 0.7));
+                const cxS = gx + gridW / 2, cyS = gy + gridH / 2;
+                // The rotated grid is gridH wide; its left edge sits this far from center.
+                const xLeft = Math.round(cxS - gridH / 2 - CELL * 1.1);
+                ctx.save();
+                ctx.font = `bold ${fontPx}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Register-based casing: for each pitch class the LOWEST (deepest) string is
+                // uppercase and any higher repeats are lowercase, independent of draw order.
+                const lowStrIdx = new Map();
+                for (let s = 0; s < COLS; s++) {
+                    const note = stringNoteLetters ? stringNoteLetters[s] : undefined;
+                    if (!note) continue;
+                    const b = note.toUpperCase();
+                    lowStrIdx.set(b, Math.max(lowStrIdx.get(b) ?? -1, s));
+                }
+                for (let col = 0; col < COLS; col++) {
+                    const strIdx = getStrIdx(col);
+                    // Reversed index: at 90°/270° the letters read in the opposite order
+                    // than in the horizontal band (swapped EADGBe).
+                    const letter = stringNoteLetters ? stringNoteLetters[strIdx] : undefined;
+                    if (!letter) continue;
+                    const base = letter.toUpperCase();
+                    const label = lowStrIdx.get(base) === strIdx ? base : base.toLowerCase();
+                    // Rotated (vertical) position of this string's column about the grid center.
+                    const dx = gx + col * CELL - cxS;
+                    const y = ((rotation % 360) === 90 ? cyS - dx : cyS + dx) + shiftY;
+                    ctx.fillStyle = (strIdx === 0 || strIdx === 1) ? '#e8d080' : 'rgba(255,255,255,0.55)';
+                    ctx.fillText(label, xLeft, y);
+                }
+                ctx.restore();
+            }
+
+            // Fret label for non-first-position chords (e.g. "2" for Dsus4). At 0°/180° it
+            // sits to the left of the grid next to the starting fret (undergoing the shiftY
+            // nudge). At 90°/270° it moves to the upper-right corner of the box instead
+            // (8px from the right edge, 16px from the top).
+            if (!isFirstPos) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(220,200,120,0.9)';
+                ctx.font = `italic ${Math.round(CELL * 0.55)}px sans-serif`;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                if (rotation === 270) {
+                    // 270°: left-aligned, 32px from the box's left edge.
+                    ctx.textAlign = 'left';
+                    ctx.fillText(String(startFret), bx + 32, by + 44);
+                } else if ((rotation % 180) !== 0) {
+                    // 90°: right-aligned, upper-right corner.
+                    ctx.fillText(String(startFret), bx + boxW - 18, by + 44);
+                } else {
+                    ctx.translate(0, shiftY);
+                    ctx.fillText(String(startFret), gx - 14, gy + CELL * 0.5);
+                }
+                ctx.restore();
+            }
+
             // Nut: CELL-proportional filled rect + subtle highlight line.
             // Thickness is 40% of CELL, floored at 2 px so it stays visible on
             // the smallest diagrams (CELL=1 on compact split panels).
             const NUT_H = Math.round(Math.max(2, CELL * 0.4));
+
+            // Rotate ONLY the fingering (nut, fret/string lines, barre, markers, dots) about
+            // the center of its grid; the open-note letters are drawn above so they stay
+            // upright. The box, border and chord title stay in place regardless of
+            // orientation (0/180 just flip; 90/270 form a horizontal shape). A rotation
+            // transform about a point leaves all absolute coordinates intact while rotating
+            // them, so the shape code below keeps using gx/gy.
+            const shapeRot = ((rotation % 360) + 360) % 360 * Math.PI / 180;
+            if (shapeRot !== 0) {
+                const cxS = gx + gridW / 2, cyS = gy + gridH / 2;
+                ctx.save();
+                ctx.translate(shiftX, shiftY);   // outermost: shifts the rotated shape (post-rotation)
+                ctx.translate(cxS, cyS);
+                ctx.rotate(shapeRot);
+                ctx.translate(-cxS, -cyS);
+            }
+
             if (isFirstPos) {
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(gx, gy - NUT_H, gridW, NUT_H);
                 ctx.fillStyle = 'rgba(255,255,255,0.4)';
                 ctx.fillRect(gx, gy - NUT_H, gridW, Math.max(1, Math.round(NUT_H * 0.25)));
-            }
-
-            // Fret label for non-first-position chords.
-            if (!isFirstPos) {
-                ctx.fillStyle = 'rgba(220,200,120,0.9)';
-                ctx.font = `italic ${Math.round(CELL * 0.55)}px sans-serif`;
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(String(startFret), gx - 14, gy + CELL * 0.5);
             }
 
             // Fret lines.
@@ -3156,7 +3265,11 @@
             // small-CELL diagrams (e.g. CELL=1 on compact split panels).
             for (let col = 0; col < COLS; col++) {
                 const strIdx = getStrIdx(col);
-                const t = COLS > 1 ? strIdx / (COLS - 1) : 1;  // 1=low E (thick), 0=high e (thin); guard COLS=1
+                // 1=low E (thick), 0=high e (thin); guard COLS=1.
+                let t = COLS > 1 ? strIdx / (COLS - 1) : 1;
+                // At 90°/270° the string order is displayed reversed, so reverse the weight
+                // to keep low-E thick / high-e thin in the visible orientation.
+                if ((rotation % 180) !== 0) t = 1 - t;
                 ctx.lineWidth = Math.max(0.5, CELL * (0.05 + t * 0.10));
                 ctx.strokeStyle = 'rgba(255,255,255,0.3)';
                 ctx.beginPath();
@@ -3252,36 +3365,6 @@
                 ctx.stroke();
             }
 
-            // String open-note letters (e.g. "EADGBe") centered in their own band between
-            // the chord name and the string markers. Case marks string register: the LOWEST
-            // occurrence of each pitch class is uppercase, every higher repeat is lowercase
-            // (standard EADGBE -> EADGBe with lowercase "e" = high E; GDDDDD -> GDdddd),
-            // so players can tell the low string from its higher octave(s).
-            if (showStringOpenNotes) {
-                const fontPx = Math.max(9, Math.round(CELL * 0.7));
-                ctx.save();
-                ctx.font = `bold ${fontPx}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const letterY = by + HEADER + STR_LABEL * 0.5;
-                // Displayed strings run low-to-high (left = low E) so the label reads like a
-                // conventional tuning, e.g. "EADGBe". The first (lowest) occurrence of each
-                // pitch class is uppercase; higher repeats are lowercase (GDDDDD -> GDdddd).
-                const seenUp = new Set();
-                for (let col = 0; col < COLS; col++) {
-                    const strIdx = getStrIdx(col);
-                    // Reverse the high-first template order so col 0 shows the low string.
-                    const letter = stringNoteLetters ? stringNoteLetters[COLS - 1 - strIdx] : undefined;
-                    if (!letter) continue;
-                    const base = letter.toUpperCase();
-                    const label = seenUp.has(base) ? base.toLowerCase() : base;
-                    seenUp.add(base);
-                    ctx.fillStyle = (strIdx === 0 || strIdx === 1) ? '#e8d080' : 'rgba(255,255,255,0.55)';
-                    ctx.fillText(label, gx + col * CELL, letterY);
-                }
-                ctx.restore();
-            }
-
             // Open/muted markers + finger dots.
             // Non-inverted: col 0 = high e → getStrIdx(0)=0 → frets[0]; col COLS-1 = low E → frets[COLS-1].
             // Inverted:     col 0 = low E → getStrIdx(0)=COLS-1 → frets[COLS-1]; col COLS-1 = high e → frets[0].
@@ -3315,6 +3398,10 @@
                 }
             }
 
+            // Undo the fingering rotation so the outer save/restore (alpha + entrance scale)
+            // closes cleanly.
+            if (shapeRot !== 0) ctx.restore();
+
             ctx.restore();
         }
 
@@ -3326,6 +3413,7 @@
                 sizeSlider = 0.5, position = 'tl', nStr = 6,
                 lyricsBottom = 0, scale: userScale = 1,
                 showStringOpenNotes = false,
+                rotation = 0,
             } = opts;
             if (!names || (!names.length && progress >= 1)) return;
             const COLS = nStr, ROWS = 4;
@@ -9261,6 +9349,7 @@
                             scale: Number(bundle.chordDiagramScale) || 1,
                             showStringOpenNotes: !!bundle.showStringOpenNotes,
                             stringNoteLetters: bundle.stringNoteLetters ?? [],
+                            rotation: Number(bundle.chordDiagramRotation) || 0,
                         });
                     }
                     if (_diagChord) {
@@ -9278,6 +9367,7 @@
                             scale: Number(bundle.chordDiagramScale) || 1,
                             showStringOpenNotes: !!bundle.showStringOpenNotes,
                             stringNoteLetters: bundle.stringNoteLetters ?? [],
+                            rotation: Number(bundle.chordDiagramRotation) || 0,
                         });
                     }
                     drawNextChords(lyricsCtx, {
@@ -9291,6 +9381,7 @@
                         nStr, lyricsBottom,
                         scale: Number(bundle.chordDiagramScale) || 1,
                         showStringOpenNotes: !!bundle.showStringOpenNotes,
+                        rotation: Number(bundle.chordDiagramRotation) || 0,
                     });
                     if (sectionHudVisible && bundle.sections && bundle.sections.length) {
                         drawSectionHud(lyricsCtx, {

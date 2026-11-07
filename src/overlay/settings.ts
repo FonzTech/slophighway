@@ -1,11 +1,13 @@
 import {
   hasTouchSupport,
   parseCameraDistance,
+  parseChordOrientation,
   parseChordShapeSize,
   parseNextChords,
   parseQuality,
   webgl2Available,
   type CameraDistance,
+  type ChordOrientation,
   type ChordShapeSize,
   type Quality,
 } from "./host3d";
@@ -27,6 +29,8 @@ export type SharedSettings = {
   chordOverride: boolean;
   /** Whether to letter each string (E A D G B e) in the chord shape box. */
   showStringOpenNotes: boolean;
+  /** Rotation (degrees) of the chord shape box. */
+  chordOrientation: ChordOrientation;
 };
 
 /** Storage key holding the shared settings plus the attached overlay's layout preferences. */
@@ -43,6 +47,7 @@ export function defaultSettings(): SharedSettings {
     optionsShown: true,
     chordOverride: false,
     showStringOpenNotes: false,
+    chordOrientation: "normal",
   };
 }
 
@@ -60,6 +65,7 @@ export function parseSettings(stored: Partial<Record<keyof SharedSettings, unkno
     chordOverride: typeof stored?.chordOverride === "boolean" ? stored.chordOverride : base.chordOverride,
     showStringOpenNotes:
       typeof stored?.showStringOpenNotes === "boolean" ? stored.showStringOpenNotes : base.showStringOpenNotes,
+    chordOrientation: parseChordOrientation(stored?.chordOrientation),
   };
 }
 
